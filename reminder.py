@@ -1,16 +1,19 @@
 import sys
+import os
 import threading
 import time
 from datetime import datetime, timedelta
 from plyer import notification
 from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QLineEdit,
                              QVBoxLayout, QPushButton, QListWidget, QDateTimeEdit)
-from PyQt5.QtCore import Qt, QDateTime
+from PyQt5.QtCore import Qt, QDateTime, QUrl
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEnginePage
 import pystray
 from PIL import Image
 import schedule
 
 reminders = []
+
 
 class ReminderApp(QWidget):
     def __init__(self):
@@ -28,6 +31,9 @@ class ReminderApp(QWidget):
 
         self.add_button = QPushButton("Add Reminder")
         self.add_button.clicked.connect(self.add_reminder)
+        self.browser_button = QPushButton("Open Web Page")
+        self.browser_button.clicked.connect(self.open_web)
+        self.layout.addWidget(self.browser_button)
 
         self.reminder_list = QListWidget()
 
@@ -51,9 +57,37 @@ class ReminderApp(QWidget):
         reminders.append({'title': title, 'datetime': datetime_obj})
         self.reminder_list.addItem(f"{title} - {datetime_obj.strftime('%Y-%m-%d %H:%M:%S')}")
 
-        # Schedule notifications
         schedule_notification(title, datetime_obj)
         self.title_input.clear()
+
+    def open_web(self):
+        self.browser_window = BrowserWindow("https://www.google.com")
+        self.browser_window.show()
+
+
+class BrowserWindow(QWidget):
+    def __init__(self, url):
+        super().__init__()
+        self.setWindowTitle("Embedded Browser")
+        self.setGeometry(100, 100, 800, 600)
+
+        # Ensure cache and storage directories exist
+        os.makedirs("./browser_cache", exist_ok=True)
+        os.makedirs("./browser_storage", exist_ok=True)
+
+        profile = QWebEngineProfile("MyProfile", self)
+        profile.setPersistentCookiesPolicy(QWebEngineProfile.ForcePersistentCookies)
+        profile.setCachePath("./browser_cache")
+        profile.setPersistentStoragePath("./browser_storage")
+
+        self.browser = QWebEngineView()
+        self.browser.setPage(QWebEnginePage(profile, self.browser))
+        self.browser.setUrl(QUrl(url))
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.browser)
+        self.setLayout(layout)
+
 
 def schedule_notification(title, dt):
     def notify():
@@ -69,15 +103,18 @@ def schedule_notification(title, dt):
         schedule.every(1).seconds.do(lambda: check_time(dt - timedelta(days=1), notify_early)).tag(title + "_early")
     schedule.every(1).seconds.do(lambda: check_time(dt, notify)).tag(title)
 
+
 def check_time(target_time, callback):
     if datetime.now() >= target_time:
         callback()
         return schedule.CancelJob
 
+
 def run_scheduler():
     while True:
         schedule.run_pending()
         time.sleep(1)
+
 
 def create_tray(app):
     icon = pystray.Icon("reminder_app")
@@ -92,6 +129,7 @@ def create_tray(app):
         pystray.MenuItem("Quit", on_quit)
     )
     threading.Thread(target=icon.run, daemon=True).start()
+
 
 if __name__ == "__main__":
     threading.Thread(target=run_scheduler, daemon=True).start()
