@@ -31,7 +31,7 @@ class ReminderApp(QWidget):
     def __init__(self):  
         super().__init__()
         self.setWindowTitle("Reminder App")
-        self.setFixedSize(300, 550)
+        self.setMinimumSize(300, 400)  
         self.layout = QVBoxLayout()
 
         self.title_input = QLineEdit()
@@ -128,11 +128,9 @@ def schedule_notification(title, dt):
     delay = (dt - datetime.now()).total_seconds()
     early_time = dt - timedelta(hours=24)
 
-    # Schedule early reminder if more than 24 hours away
     if early_time > datetime.now():
         schedule.every(1).seconds.do(lambda: check_time(early_time, notify_early)).tag(title + "_early")
 
-    # Always schedule main reminder
     schedule.every(1).seconds.do(lambda: check_time(dt, notify)).tag(title)
 
 def cancel_scheduled(title):
@@ -189,11 +187,10 @@ def auto_delete_old_reminders(window):
         for i, r in enumerate(reminders):
             if r['datetime'] < now:
                 to_delete.append(i)
-        # Delete from the end to avoid index shifting
         for i in reversed(to_delete):
             del reminders[i]
             window.reminder_list.takeItem(i)
-        time.sleep(5)  # Check every minute
+        time.sleep(5) 
 
 if __name__ == "__main__":
     threading.Thread(target=run_scheduler, daemon=True).start()
