@@ -73,6 +73,7 @@ class ReminderApp(QWidget):
         datetime_obj = self.datetime_input.dateTime().toPyDateTime()
 
         if not title or datetime_obj <= datetime.now():
+            QMessageBox.warning(self, "Warning", "Masukkan waktu yang akan datang dan judul yang valid.")
             return
 
         reminders.append({'title': title, 'datetime': datetime_obj})
@@ -125,10 +126,13 @@ def schedule_notification(title, dt):
         notification.notify(title="Upcoming Reminder", message=f"{title} in 24 hours", timeout=10)
 
     delay = (dt - datetime.now()).total_seconds()
-    early_delay = delay - 86400  # 24 hours
+    early_time = dt - timedelta(hours=24)
 
-    if early_delay > 0:
-        schedule.every(1).seconds.do(lambda: check_time(dt - timedelta(days=1), notify_early)).tag(title + "_early")
+    # Schedule early reminder if more than 24 hours away
+    if early_time > datetime.now():
+        schedule.every(1).seconds.do(lambda: check_time(early_time, notify_early)).tag(title + "_early")
+
+    # Always schedule main reminder
     schedule.every(1).seconds.do(lambda: check_time(dt, notify)).tag(title)
 
 def cancel_scheduled(title):
