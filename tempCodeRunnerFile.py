@@ -18,7 +18,7 @@ class ReminderApp(QWidget):
     def __init__(self):  
         super().__init__()
         self.setWindowTitle("Reminder App")
-        self.setFixedSize(1000, 1000)
+        self.setFixedSize(300, 500)
         self.layout = QVBoxLayout()
 
         self.title_input = QLineEdit()
