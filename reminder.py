@@ -182,10 +182,26 @@ def create_tray(app, window):
 
     threading.Thread(target=icon.run, daemon=True).start()
 
+def auto_delete_old_reminders(window):
+    while True:
+        now = datetime.now()
+        to_delete = []
+        for i, r in enumerate(reminders):
+            if r['datetime'] < now:
+                to_delete.append(i)
+        # Delete from the end to avoid index shifting
+        for i in reversed(to_delete):
+            del reminders[i]
+            window.reminder_list.takeItem(i)
+        time.sleep(5)  # Check every minute
+
 if __name__ == "__main__":
     threading.Thread(target=run_scheduler, daemon=True).start()
     app = QApplication(sys.argv)
     window = ReminderApp()
     create_tray(app, window)
+    threading.Thread(target=auto_delete_old_reminders, args=(window,), daemon=True).start()
+    window.show()
+    sys.exit(app.exec_())
     window.show()
     sys.exit(app.exec_())
