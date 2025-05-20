@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QPushButton, QListWidget, QDateTimeEdit, QMessageBox,
     QComboBox, QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit
 )
-from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize, QTime
+from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize, QTime, QTimer
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtGui import QIcon, QPixmap
 import pystray
@@ -26,21 +26,48 @@ ALARM_SOUND_PATH = BASE_DIR / "alarm"
 ICON_PATH = BASE_DIR / "img" / "icon.png"
 
 reminders = []
+# Create a global variable to store the image popup reference
+image_popup = None
 
 class ImagePopup(QWidget):
     def __init__(self, image_path):
         super().__init__()
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)  # Added Qt.Tool flag
+        self.setAttribute(Qt.WA_DeleteOnClose)  # Ensure proper cleanup on close
         self.setStyleSheet("background-color: black;")
         
+        print(f"Creating popup with image: {image_path}")
+        
+        # Verify image file exists
+        if not os.path.isfile(image_path):
+            print(f"Image file does not exist: {image_path}")
+            self.close()
+            return
+            
         layout = QVBoxLayout()
         self.image_label = QLabel()
-        pixmap = QPixmap(image_path)
-        scaled_pixmap = pixmap.scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        self.image_label.setPixmap(scaled_pixmap)
+        
+        # Load and display image
+        try:
+            pixmap = QPixmap(image_path)
+            if pixmap.isNull():
+                print(f"Failed to load image: {image_path}")
+                self.close()
+                return
+                
+            print(f"Image loaded successfully, dimensions: {pixmap.width()}x{pixmap.height()}")
+            scaled_pixmap = pixmap.scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.image_label.setPixmap(scaled_pixmap)
+            
+        except Exception as e:
+            print(f"Error loading image: {e}")
+            self.close()
+            return
+            
         layout.addWidget(self.image_label)
         self.setLayout(layout)
         
+        # Position the popup at the bottom right corner
         screen = QApplication.desktop().screenGeometry()
         self.setGeometry(
             screen.width() - 320, 
@@ -48,8 +75,27 @@ class ImagePopup(QWidget):
             300, 300
         )
         
-        self.timer = threading.Timer(10.0, self.close)
-        self.timer.start()
+        # Add a click event to close the popup when clicked
+        self.mousePressEvent = lambda event: self.close()
+        
+        # Use QTimer instead of threading.Timer for closing the widget
+        self.close_timer = QTimer(self)
+        self.close_timer.timeout.connect(self.close)
+        self.close_timer.setSingleShot(True)
+        self.close_timer.start(10000)  # 10 seconds
+        
+        # Force window activation and raise to top
+        self.activateWindow()
+        self.raise_()
+        
+        print("Popup created successfully")
+        
+    def showEvent(self, event):
+        # Ensure window is activated when shown
+        self.activateWindow()
+        self.raise_()
+        super().showEvent(event)
+
 
 class BrowserWindow(QWidget):
     def __init__(self, url="https://lms.telkomuniversity.ac.id"):
@@ -239,28 +285,52 @@ def play_alarm():
         print(f"Error playing sound: {e}")
 
 def show_image():
+    """Shows a random character image in a popup window"""
     try:
+        # Check if image directory exists
+        if not os.path.exists(CHAR_IMG_PATH):
+            print(f"Image directory not found: {CHAR_IMG_PATH}")
+            return
+            
+        # Get list of image files
         images = [os.path.join(CHAR_IMG_PATH, f) for f in os.listdir(CHAR_IMG_PATH) 
-                 if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif'))]
+                if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif'))]
         
         if not images:
             print("No character images found.")
             return
             
         image_file = random.choice(images)
+        print(f"Selected image: {image_file}")
         
+        # For Windows compatibility, use a mainloop-friendly approach
         app = QApplication.instance()
-        popup = ImagePopup(image_file)
-        popup.show()
-        
+        if app:
+            # Create popup directly
+            popup = ImagePopup(image_file)
+            popup.show()
+            print("Popup should be visible now")
+            
+            # Store reference as instance attribute on app to prevent garbage collection
+            app.image_popup = popup
+            
     except Exception as e:
         print(f"Error showing image: {e}")
 
 def schedule_notification(title, dt):
     def notify():
-        notification.notify(title="Reminder", message=title, timeout=10)
-        play_alarm()
-        show_image()
+        try:
+            notification.notify(title="Reminder", message=title, timeout=10)
+            print(f"Notification displayed for reminder: {title}")
+            
+            # Play sound
+            play_alarm()
+            
+            # Show image - no QTimer here since we're in a different thread
+            show_image()
+            
+        except Exception as e:
+            print(f"Error in notification: {e}")
 
     def notify_early():
         notification.notify(title="Upcoming Reminder", message=f"{title} in 24 hours", timeout=10)
@@ -324,18 +394,46 @@ def auto_delete_old_reminders(window):
         for i, r in enumerate(reminders):
             if r['datetime'] < now:
                 to_delete.append(i)
-        for i in reversed(to_delete):
-            del reminders[i]
-            window.reminder_list.takeItem(i)
-        time.sleep(5) 
         
-        #test
+        # If we have reminders to delete, use QTimer to do it in the main thread
+        if to_delete:
+            def delete_items():
+                for i in reversed(to_delete):
+                    if i < len(reminders):  # Check if index still valid
+                        del reminders[i]
+                        if i < window.reminder_list.count():  # Check if list item exists
+                            window.reminder_list.takeItem(i)
+            
+            QTimer.singleShot(0, delete_items)
+            
+        time.sleep(5) 
 
 if __name__ == "__main__":
-    threading.Thread(target=run_scheduler, daemon=True).start()
+    # Create the QApplication instance first
     app = QApplication(sys.argv)
+    
+    # Start the scheduler thread
+    threading.Thread(target=run_scheduler, daemon=True).start()
+    
+    # Create the main window
     window = ReminderApp()
+    
+    # Set up system tray
     tray_icon = create_system_tray(app, window)
+    
+    # Start the auto-delete thread
     threading.Thread(target=auto_delete_old_reminders, args=(window,), daemon=True).start()
+    
+    # Print path information for debugging
+    print(f"Base directory: {BASE_DIR}")
+    print(f"Character images path: {CHAR_IMG_PATH}")
+    print(f"Alarm sounds path: {ALARM_SOUND_PATH}")
+    print(f"Icon path: {ICON_PATH}")
+    
+    # Test if directories exist
+    print(f"Character directory exists: {os.path.exists(CHAR_IMG_PATH)}")
+    print(f"Alarm directory exists: {os.path.exists(ALARM_SOUND_PATH)}")
+    
+    # Show the window and start the event loop
     window.show()
     sys.exit(app.exec_())
