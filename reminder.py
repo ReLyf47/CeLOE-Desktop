@@ -65,11 +65,8 @@ popup_manager = None  # Global reference
 class ReminderTab(QWidget):
     def __init__(self):
         super().__init__()
-<<<<<<< Updated upstream
-=======
         self.setWindowTitle("CeLOE Reminder App")
         self.setMinimumSize(500, 600)
->>>>>>> Stashed changes
         self.layout = QVBoxLayout()
 
         title_label = QLabel("Judul Pengingat:")
