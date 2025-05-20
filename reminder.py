@@ -23,6 +23,7 @@ import pygame
 BASE_DIR = Path(__file__).resolve().parent
 CHAR_IMG_PATH = BASE_DIR / "chara"
 ALARM_SOUND_PATH = BASE_DIR / "alarm"
+ICON_PATH = BASE_DIR / "img" / "icon.png"
 
 reminders = []
 
@@ -287,7 +288,7 @@ def run_scheduler():
         time.sleep(1)
 
 def create_system_tray(app, window):
-    tray_icon = QSystemTrayIcon(QIcon("./img/icon.png"), app)
+    tray_icon = QSystemTrayIcon(QIcon(str(ICON_PATH)), app)
     tray_menu = QMenu()
     
     open_action = tray_menu.addAction("Buka Aplikasi")
