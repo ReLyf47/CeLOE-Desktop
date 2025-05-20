@@ -328,6 +328,8 @@ def auto_delete_old_reminders(window):
             del reminders[i]
             window.reminder_list.takeItem(i)
         time.sleep(5) 
+        
+        #test
 
 if __name__ == "__main__":
     threading.Thread(target=run_scheduler, daemon=True).start()
