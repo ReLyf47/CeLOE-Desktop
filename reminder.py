@@ -83,6 +83,7 @@ def get_light_stylesheet():
 class ReminderTab(QWidget):
     def __init__(self):
         super().__init__()
+        self.setWindowTitle("CeLOE Reminder App")
         self.setMinimumSize(500, 600)
         self.layout = QVBoxLayout()
 
