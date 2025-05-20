@@ -4,7 +4,6 @@ import time
 import random
 import os
 import shutil
-import pystray
 import pygame
 import schedule
 from datetime import datetime, timedelta
@@ -12,13 +11,11 @@ from plyer import notification
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout,
     QVBoxLayout, QPushButton, QListWidget, QDateTimeEdit, QMessageBox,
-    QComboBox, QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit, QTabWidget, QAction,
-    QFileDialog, QGroupBox, QRadioButton, QScrollArea
+    QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit, QTabWidget, QFileDialog, QGroupBox, QRadioButton
 )
 from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize, QTime, QObject, pyqtSignal
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtGui import QIcon, QPixmap, QMovie
-from PIL import Image
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
