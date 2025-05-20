@@ -16,11 +16,13 @@ from PyQt5.QtGui import QIcon, QPixmap
 import pystray
 from PIL import Image
 import schedule
+from pathlib import Path
 import pygame
 
 # Path folders for images & sounds - modify these paths to your actual locations
-CHAR_IMG_PATH = r"./chara"
-ALARM_SOUND_PATH = r"./alarm"
+BASE_DIR = Path(__file__).resolve().parent
+CHAR_IMG_PATH = BASE_DIR / "chara"
+ALARM_SOUND_PATH = BASE_DIR / "alarm"
 
 reminders = []
 
