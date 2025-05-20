@@ -8,7 +8,7 @@ from plyer import notification
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout,
     QVBoxLayout, QPushButton, QListWidget, QDateTimeEdit, QMessageBox,
-    QComboBox, QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit, QTabWidget
+    QComboBox, QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit, QTabWidget, QAction
 )
 from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize, QTime, QObject, pyqtSignal
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -30,11 +30,7 @@ class ImagePopup(QWidget):
     def __init__(self, image_path):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-<<<<<<< Updated upstream
-        self.setAttribute(Qt.WA_TransLucentBackground)
-=======
         self.setAttribute(Qt.WA_TranslucentBackground)
->>>>>>> Stashed changes
         self.setStyleSheet("background-color: transparent;")
 
         layout = QVBoxLayout()
@@ -66,14 +62,28 @@ class PopupManager(QObject):
 
 popup_manager = None  # Global reference
 
+def get_dark_stylesheet():
+    return """
+    QWidget { background-color: #121212; color: #e0e0e0; font-family: Segoe UI, Arial; font-size: 10pt; }
+    QPushButton { background-color: #1f1f1f; color: white; border: none; padding: 8px; border-radius: 4px; }
+    QPushButton:hover { background-color: #3a3a3a; }
+    QLineEdit, QDateTimeEdit, QTimeEdit, QListWidget { background-color: #1f1f1f; color: white; border: 1px solid #555; border-radius: 4px; }
+    QLabel { font-weight: bold; }
+    """
+
+def get_light_stylesheet():
+    return """
+    QWidget { font-family: Segoe UI, Arial; font-size: 10pt; }
+    QPushButton { background-color: #0d6efd; color: white; border: none; padding: 8px; border-radius: 4px; }
+    QPushButton:hover { background-color: #0b5ed7; }
+    QLineEdit, QDateTimeEdit, QTimeEdit { padding: 6px; border: 1px solid #ced4da; border-radius: 4px; }
+    QLabel { font-weight: bold; }
+    """
+
 class ReminderTab(QWidget):
     def __init__(self):
         super().__init__()
-<<<<<<< Updated upstream
-=======
-        self.setWindowTitle("CeLOE Reminder App")
         self.setMinimumSize(500, 600)
->>>>>>> Stashed changes
         self.layout = QVBoxLayout()
 
         title_label = QLabel("Judul Pengingat:")
@@ -202,14 +212,28 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.reminder_tab, "Reminder")
         self.tabs.addTab(self.celoe_tab, "CeLOE")
 
-        self.setStyleSheet("""
-            QWidget { font-family: Segoe UI, Arial; font-size: 10pt; }
-            QPushButton { background-color: #0d6efd; color: white; border: none; padding: 8px; border-radius: 4px; }
-            QPushButton:hover { background-color: #0b5ed7; }
-            QLineEdit, QDateTimeEdit, QTimeEdit { padding: 6px; border: 1px solid #ced4da; border-radius: 4px; }
-            QLabel { font-weight: bold; }
-        """)
+        self.dark_mode = False
 
+        menubar = self.menuBar()
+        view_menu = menubar.addMenu("Tampilan")
+        toggle_theme_action = QAction("Mode Gelap / Terang", self)
+        toggle_theme_action.triggered.connect(self.toggle_theme)
+        view_menu.addAction(toggle_theme_action)
+
+        self.toggle_theme_button = QPushButton("🌙 Mode ")
+        self.toggle_theme_button.clicked.connect(self.toggle_theme)
+        self.toggle_theme_button.setMaximumWidth(200)
+        menubar.setCornerWidget(self.toggle_theme_button, Qt.TopRightCorner)
+
+        self.apply_theme()
+
+    def toggle_theme(self):
+        self.dark_mode = not self.dark_mode
+        self.apply_theme()
+
+    def apply_theme(self):
+        stylesheet = get_dark_stylesheet() if self.dark_mode else get_light_stylesheet()
+        self.setStyleSheet(stylesheet)
 
 def play_alarm():
     try:
@@ -244,6 +268,8 @@ def schedule_notification(title, dt):
         show_image()
     def notify_early():
         notification.notify(title="Upcoming Reminder", message=f"{title} in 24 hours", timeout=10)
+        play_alarm()
+        show_image()
     delay = (dt - datetime.now()).total_seconds()
     early_time = dt - timedelta(hours=24)
     if early_time > datetime.now():
