@@ -8,7 +8,7 @@ from plyer import notification
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout,
     QVBoxLayout, QPushButton, QListWidget, QDateTimeEdit, QMessageBox,
-    QComboBox, QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit
+    QComboBox, QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit, QTabWidget
 )
 from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize, QTime, QObject, pyqtSignal
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -30,7 +30,8 @@ class ImagePopup(QWidget):
     def __init__(self, image_path):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-        self.setStyleSheet("background-color: black;")
+        self.setAttribute(Qt.WA_TransLucentBackground)
+        self.setStyleSheet("background-color: transparent;")
 
         layout = QVBoxLayout()
         self.image_label = QLabel()
@@ -61,23 +62,9 @@ class PopupManager(QObject):
 
 popup_manager = None  # Global reference
 
-class BrowserWindow(QWidget):
-    def __init__(self, url="https://lms.telkomuniversity.ac.id"):
-        super().__init__()
-        self.setWindowTitle("Learning Management System")
-        self.setGeometry(100, 100, 800, 600)
-
-        layout = QVBoxLayout()
-        self.browser = QWebEngineView()
-        self.browser.setUrl(QUrl(url))
-        layout.addWidget(self.browser)
-        self.setLayout(layout)
-
-class ReminderApp(QWidget):
+class ReminderTab(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("CELOE Reminder App")
-        self.setMinimumSize(500, 600)
         self.layout = QVBoxLayout()
 
         title_label = QLabel("Judul Pengingat:")
@@ -111,9 +98,6 @@ class ReminderApp(QWidget):
         self.delete_button = QPushButton("Hapus Reminder")
         self.delete_button.clicked.connect(self.delete_reminder)
 
-        self.browser_button = QPushButton("CeLOE")
-        self.browser_button.clicked.connect(self.open_browser)
-
         list_label = QLabel("Daftar Reminder:")
         self.reminder_list = QListWidget()
         self.reminder_list.itemClicked.connect(self.on_select)
@@ -125,17 +109,8 @@ class ReminderApp(QWidget):
         self.layout.addWidget(self.add_button)
         self.layout.addWidget(self.edit_button)
         self.layout.addWidget(self.delete_button)
-        self.layout.addWidget(self.browser_button)
         self.layout.addWidget(list_label)
         self.layout.addWidget(self.reminder_list)
-
-        self.setStyleSheet("""
-            QWidget { font-family: Segoe UI, Arial; font-size: 10pt; }
-            QPushButton { background-color: #0d6efd; color: white; border: none; padding: 8px; border-radius: 4px; }
-            QPushButton:hover { background-color: #0b5ed7; }
-            QLineEdit, QDateTimeEdit, QTimeEdit { padding: 6px; border: 1px solid #ced4da; border-radius: 4px; }
-            QLabel { font-weight: bold; }
-        """)
 
         self.setLayout(self.layout)
         pygame.mixer.init()
@@ -197,9 +172,35 @@ class ReminderApp(QWidget):
         del reminders[selected]
         self.reminder_list.takeItem(selected)
 
-    def open_browser(self):
-        self.browser_window = BrowserWindow()
-        self.browser_window.show()
+class BrowserTab(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout()
+        self.browser = QWebEngineView()
+        self.browser.setUrl(QUrl("https://lms.telkomuniversity.ac.id"))
+        layout.addWidget(self.browser)
+        self.setLayout(layout)
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("CELOE Reminder App")
+        self.setMinimumSize(800, 600)
+        self.tabs = QTabWidget()
+        self.setCentralWidget(self.tabs)
+        self.reminder_tab = ReminderTab()
+        self.celoe_tab = BrowserTab()
+        self.tabs.addTab(self.reminder_tab, "Reminder")
+        self.tabs.addTab(self.celoe_tab, "CeLOE")
+
+        self.setStyleSheet("""
+            QWidget { font-family: Segoe UI, Arial; font-size: 10pt; }
+            QPushButton { background-color: #0d6efd; color: white; border: none; padding: 8px; border-radius: 4px; }
+            QPushButton:hover { background-color: #0b5ed7; }
+            QLineEdit, QDateTimeEdit, QTimeEdit { padding: 6px; border: 1px solid #ced4da; border-radius: 4px; }
+            QLabel { font-weight: bold; }
+        """)
+
 
 def play_alarm():
     try:
@@ -284,12 +285,12 @@ def auto_delete_old_reminders(window):
                 to_delete.append(i)
         for i in reversed(to_delete):
             del reminders[i]
-            window.reminder_list.takeItem(i)
+            window.reminder_tab.reminder_list.takeItem(i)
         time.sleep(5)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = ReminderApp()
+    window = MainWindow()
     popup_manager = PopupManager()
     tray_icon = create_system_tray(app, window)
     threading.Thread(target=run_scheduler, daemon=True).start()
