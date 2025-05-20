@@ -30,7 +30,11 @@ class ImagePopup(QWidget):
     def __init__(self, image_path):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+<<<<<<< Updated upstream
         self.setAttribute(Qt.WA_TransLucentBackground)
+=======
+        self.setAttribute(Qt.WA_TranslucentBackground)
+>>>>>>> Stashed changes
         self.setStyleSheet("background-color: transparent;")
 
         layout = QVBoxLayout()
@@ -65,6 +69,11 @@ popup_manager = None  # Global reference
 class ReminderTab(QWidget):
     def __init__(self):
         super().__init__()
+<<<<<<< Updated upstream
+=======
+        self.setWindowTitle("CeLOE Reminder App")
+        self.setMinimumSize(500, 600)
+>>>>>>> Stashed changes
         self.layout = QVBoxLayout()
 
         title_label = QLabel("Judul Pengingat:")
@@ -219,7 +228,7 @@ def show_image():
     global popup_manager
     try:
         images = [os.path.join(CHAR_IMG_PATH, f) for f in os.listdir(CHAR_IMG_PATH)
-                  if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif'))]
+                  if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp'))]
         if not images:
             print("No character images found.")
             return
