@@ -8,9 +8,9 @@ from plyer import notification
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout,
     QVBoxLayout, QPushButton, QListWidget, QDateTimeEdit, QMessageBox,
-    QComboBox, QMainWindow, QSystemTrayIcon, QMenu
+    QComboBox, QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit
 )
-from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize
+from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize, QTime
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtGui import QIcon, QPixmap
 import pystray
@@ -74,32 +74,22 @@ class ReminderApp(QWidget):
         datetime_label = QLabel("Tanggal & Waktu:")
         datetime_frame = QHBoxLayout()
         
-        self.date_input = QDateTimeEdit(QDateTime.currentDateTime())
+        # Date picker
+        self.date_input = QDateTimeEdit()
         self.date_input.setDisplayFormat("dd/MM/yyyy")
         self.date_input.setCalendarPopup(True)
+        self.date_input.setDate(QDateTime.currentDateTime().date())
         
-        self.hour_selector = QComboBox()
-        for hour in range(24):
-            self.hour_selector.addItem(f"{hour:02d}")
-        self.hour_selector.setCurrentIndex(QDateTime.currentDateTime().time().hour())
-        
-        self.minute_selector = QComboBox()
-        for minute in range(60):
-            self.minute_selector.addItem(f"{minute:02d}")
-        self.minute_selector.setCurrentIndex(QDateTime.currentDateTime().time().minute())
-        
-        self.second_selector = QComboBox()
-        for second in range(60):
-            self.second_selector.addItem(f"{second:02d}")
-        self.second_selector.setCurrentIndex(QDateTime.currentDateTime().time().second())
+        # Time picker - replacing the hour, minute, second combo boxes
+        self.time_input = QTimeEdit()
+        self.time_input.setDisplayFormat("HH:mm:ss")
+        self.time_input.setTime(QDateTime.currentDateTime().time())
+        self.time_input.setTimeRange(QTime(0, 0, 0), QTime(23, 59, 59))
+        self.time_input.setButtonSymbols(QTimeEdit.PlusMinus)
+        self.time_input.setCalendarPopup(True)  # Enables the popup for time selection
         
         datetime_frame.addWidget(self.date_input)
-        datetime_frame.addWidget(QLabel("H:"))
-        datetime_frame.addWidget(self.hour_selector)
-        datetime_frame.addWidget(QLabel("M:"))
-        datetime_frame.addWidget(self.minute_selector)
-        datetime_frame.addWidget(QLabel("S:"))
-        datetime_frame.addWidget(self.second_selector)
+        datetime_frame.addWidget(self.time_input)
         
         self.add_button = QPushButton("Tambah Reminder")
         self.add_button.clicked.connect(self.add_reminder)
@@ -143,7 +133,7 @@ class ReminderApp(QWidget):
             QPushButton:hover {
                 background-color: #0b5ed7;
             }
-            QLineEdit, QDateTimeEdit, QComboBox {
+            QLineEdit, QDateTimeEdit, QTimeEdit {
                 padding: 6px;
                 border: 1px solid #ced4da;
                 border-radius: 4px;
@@ -163,19 +153,16 @@ class ReminderApp(QWidget):
             reminder = reminders[index]
             self.title_input.setText(reminder['title'])
             dt = reminder['datetime']
-            self.datetime_input.setDateTime(QDateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute))
+            self.date_input.setDate(dt.date())
+            self.time_input.setTime(QTime(dt.hour, dt.minute, dt.second))
 
     def get_selected_datetime(self):
-        """Get the combined datetime from separate selectors"""
+        """Get the combined datetime from separate date and time selectors"""
         selected_date = self.date_input.date().toPyDate()
-        selected_hour = int(self.hour_selector.currentText())
-        selected_minute = int(self.minute_selector.currentText())
-        selected_second = int(self.second_selector.currentText())
+        selected_time = self.time_input.time().toPyTime()
         
-        return datetime.combine(selected_date, 
-                               datetime.min.time()) + timedelta(hours=selected_hour, 
-                                                               minutes=selected_minute,
-                                                               seconds=selected_second)
+        # Combine date and time into a datetime object
+        return datetime.combine(selected_date, selected_time)
 
     def add_reminder(self):
         title = self.title_input.text().strip()
@@ -201,7 +188,7 @@ class ReminderApp(QWidget):
             return
 
         title = self.title_input.text().strip()
-        datetime_obj = self.datetime_input.dateTime().toPyDateTime()
+        datetime_obj = self.get_selected_datetime()
 
         if not title:
             QMessageBox.warning(self, "Warning", "Masukkan judul pengingat.")
@@ -215,7 +202,7 @@ class ReminderApp(QWidget):
         cancel_scheduled(old['title'])
 
         reminders[selected] = {'title': title, 'datetime': datetime_obj}
-        self.reminder_list.item(selected).setText(f"{title} | {datetime_obj.strftime('%Y-%m-%d %H:%M')}")
+        self.reminder_list.item(selected).setText(f"{title} | {datetime_obj.strftime('%Y-%m-%d %H:%M:%S')}")
         schedule_notification(title, datetime_obj)
 
     def delete_reminder(self):
