@@ -30,11 +30,7 @@ class ImagePopup(QWidget):
     def __init__(self, image_path):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-<<<<<<< Updated upstream
-        self.setAttribute(Qt.WA_TransLucentBackground)
-=======
         self.setAttribute(Qt.WA_TranslucentBackground)
->>>>>>> Stashed changes
         self.setStyleSheet("background-color: transparent;")
 
         layout = QVBoxLayout()
