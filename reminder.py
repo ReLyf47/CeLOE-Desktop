@@ -216,12 +216,7 @@ class MainWindow(QMainWindow):
         self.dark_mode = False
 
         menubar = self.menuBar()
-        view_menu = menubar.addMenu("Tampilan")
-        toggle_theme_action = QAction("Mode Gelap / Terang", self)
-        toggle_theme_action.triggered.connect(self.toggle_theme)
-        view_menu.addAction(toggle_theme_action)
-
-        self.toggle_theme_button = QPushButton("🌙 Mode ")
+        self.toggle_theme_button = QPushButton("Toggle Mode")
         self.toggle_theme_button.clicked.connect(self.toggle_theme)
         self.toggle_theme_button.setMaximumWidth(200)
         menubar.setCornerWidget(self.toggle_theme_button, Qt.TopRightCorner)
