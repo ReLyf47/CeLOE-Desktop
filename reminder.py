@@ -333,9 +333,20 @@ class CustomizeTab(QWidget):
             self, "Pilih Gambar", "", "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.webp)"
         )
         if file_path:
-            destination = CUSTOM_IMG_PATH / os.path.basename(file_path)
-            shutil.copy2(file_path, destination)
-            selected_image = str(destination)
+            file_name = os.path.basename(file_path)
+            destination = CUSTOM_IMG_PATH / file_name
+            if Path(file_path).resolve() == destination.resolve():
+                selected_image = str(destination)
+            else:
+                try:
+                    shutil.copy2(file_path, destination)
+                    selected_image = str(destination)
+                except shutil.SameFileError:
+                    selected_image = file_path
+                except Exception as e:
+                    QMessageBox.warning(self, "Error", f"Failed to copy image: {e}")
+                    return
+                
             self.selected_image_label.setText(f"Terpilih: {os.path.basename(selected_image)}")
             pixmap = QPixmap(selected_image)
             self.image_preview.setPixmap(pixmap.scaled(180, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation))
@@ -347,10 +358,20 @@ class CustomizeTab(QWidget):
             self, "Pilih Suara", "", "Sound Files (*.mp3 *.wav)"
         )
         if file_path:
-            # Copy file to custom directory
-            destination = CUSTOM_SOUND_PATH / os.path.basename(file_path)
-            shutil.copy2(file_path, destination)
-            selected_sound = str(destination)
+            file_name = os.path.basename(file_path)
+            destination = CUSTOM_SOUND_PATH / file_name
+            if Path(file_path).resolve() == destination.resolve():
+                selected_sound = str(destination)
+            else:
+                try:
+                    shutil.copy2(file_path, destination)
+                    selected_sound = str(destination)
+                except shutil.SameFileError:
+                    selected_sound = file_path
+                except Exception as e:
+                    QMessageBox.warning(self, "Error", f"Failed to copy sound: {e}")
+                    return
+                
             self.selected_sound_label.setText(f"Terpilih: {os.path.basename(selected_sound)}")
             self.test_sound_button.setEnabled(True)
     
