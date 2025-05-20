@@ -4,6 +4,9 @@ import time
 import random
 import os
 import shutil
+import pystray
+import pygame
+import schedule
 from datetime import datetime, timedelta
 from plyer import notification
 from PyQt5.QtWidgets import (
@@ -14,12 +17,9 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize, QTime, QObject, pyqtSignal
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtGui import QIcon, QPixmap
-import pystray
+from PyQt5.QtGui import QIcon, QPixmap, QMovie
 from PIL import Image
-import schedule
 from pathlib import Path
-import pygame
 
 BASE_DIR = Path(__file__).resolve().parent
 CHAR_IMG_PATH = BASE_DIR / "chara"
@@ -47,17 +47,85 @@ class ImagePopup(QWidget):
 
         layout = QVBoxLayout()
         self.image_label = QLabel()
-        pixmap = QPixmap(image_path)
-        scaled_pixmap = pixmap.scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        self.image_label.setPixmap(scaled_pixmap)
         layout.addWidget(self.image_label)
         self.setLayout(layout)
 
-        screen = QApplication.desktop().screenGeometry()
-        self.setGeometry(screen.width() - 320, screen.height() - 350, 300, 300)
+        # Handle different image types
+        if image_path.lower().endswith('.gif'):
+            self.movie = QMovie(image_path)
+            self.movie.frameChanged.connect(self.adjust_size)
+            self.image_label.setMovie(self.movie)
+            self.movie.start()
+        else:
+            # Handle static images
+            self.pixmap = QPixmap(image_path)
+            self.adjust_size()
 
+        # Center the window
+        self.center_on_screen()
+        
+        # Close after 10 seconds
         self.timer = threading.Timer(10.0, self.close)
         self.timer.start()
+
+    def adjust_size(self, frame_num=0):
+        """Adjust window size based on image dimensions"""
+        if hasattr(self, 'movie'):
+            # For animated GIFs
+            size = self.movie.currentImage().size()
+            if not size.isValid():
+                return
+        else:
+            # For static images
+            size = self.pixmap.size()
+            if not size.isValid():
+                return
+
+        # Get screen dimensions
+        screen = QApplication.primaryScreen().availableGeometry()
+        max_width = screen.width() * 0.8  # Max 80% of screen width
+        max_height = screen.height() * 0.8  # Max 80% of screen height
+
+        # Calculate target size maintaining aspect ratio
+        width = size.width()
+        height = size.height()
+        aspect = width / height
+
+        # Ensure minimum size of 300px
+        width = max(width, 300)
+        height = max(height, 300)
+        
+        # Scale down if too large for screen
+        if width > max_width or height > max_height:
+            if width / max_width > height / max_height:
+                width = max_width
+                height = width / aspect
+            else:
+                height = max_height
+                width = height * aspect
+
+        # Set the image and window size
+        if hasattr(self, 'movie'):
+            self.movie.setScaledSize(QSize(int(width), int(height)))
+            self.image_label.setFixedSize(int(width), int(height))
+        else:
+            scaled_pixmap = self.pixmap.scaled(int(width), int(height), 
+                                             Qt.KeepAspectRatio, 
+                                             Qt.SmoothTransformation)
+            self.image_label.setPixmap(scaled_pixmap)
+            self.image_label.setFixedSize(int(width), int(height))
+
+        self.resize(int(width), int(height))
+        self.center_on_screen()
+
+    def center_on_screen(self):
+        """Center the window on screen"""
+        screen = QApplication.primaryScreen().availableGeometry()
+        size = self.size()
+        self.move(
+            (screen.width() - size.width()) // 2,
+            (screen.height() - size.height()) // 2
+        )
 
 class PopupManager(QObject):
     show_image_signal = pyqtSignal(str)
@@ -224,23 +292,23 @@ class CustomizeTab(QWidget):
         layout = QVBoxLayout()
         
         # Images section
-        image_group = QGroupBox("Image Settings")
+        image_group = QGroupBox("Setting Notifikasi")
         image_layout = QVBoxLayout()
         
-        self.default_image_radio = QRadioButton("Use Default Images")
+        self.default_image_radio = QRadioButton("Gunakan gambar Default")
         self.default_image_radio.setChecked(not use_custom_image)
         self.default_image_radio.toggled.connect(self.toggle_image_source)
         
-        self.custom_image_radio = QRadioButton("Use Custom Image")
+        self.custom_image_radio = QRadioButton("Gunakan gamber Custom")
         self.custom_image_radio.setChecked(use_custom_image)
         
-        self.select_image_button = QPushButton("Select Custom Image")
+        self.select_image_button = QPushButton("Pilih gambar")
         self.select_image_button.clicked.connect(self.select_custom_image)
         self.select_image_button.setEnabled(use_custom_image)
         
-        self.selected_image_label = QLabel("No custom image selected")
+        self.selected_image_label = QLabel("Gambar tidak ada yang dipilih")
         if selected_image:
-            self.selected_image_label.setText(f"Selected: {os.path.basename(selected_image)}")
+            self.selected_image_label.setText(f"Terpilih: {os.path.basename(selected_image)}")
         
         self.image_preview = QLabel()
         self.image_preview.setFixedSize(200, 200)
@@ -258,25 +326,25 @@ class CustomizeTab(QWidget):
         image_group.setLayout(image_layout)
         
         # Sound section
-        sound_group = QGroupBox("Sound Settings")
+        sound_group = QGroupBox("Setting suara")
         sound_layout = QVBoxLayout()
         
-        self.default_sound_radio = QRadioButton("Use Default Sounds")
+        self.default_sound_radio = QRadioButton("Gunakan suara Default")
         self.default_sound_radio.setChecked(not use_custom_sound)
         self.default_sound_radio.toggled.connect(self.toggle_sound_source)
         
-        self.custom_sound_radio = QRadioButton("Use Custom Sound")
+        self.custom_sound_radio = QRadioButton("Gunakan suara Custom")
         self.custom_sound_radio.setChecked(use_custom_sound)
         
-        self.select_sound_button = QPushButton("Select Custom Sound")
+        self.select_sound_button = QPushButton("Pilih suara")
         self.select_sound_button.clicked.connect(self.select_custom_sound)
         self.select_sound_button.setEnabled(use_custom_sound)
         
-        self.selected_sound_label = QLabel("No custom sound selected")
+        self.selected_sound_label = QLabel("Tidak ada suara yang dipilih")
         if selected_sound:
-            self.selected_sound_label.setText(f"Selected: {os.path.basename(selected_sound)}")
+            self.selected_sound_label.setText(f"Terpilih: {os.path.basename(selected_sound)}")
         
-        self.test_sound_button = QPushButton("Test Sound")
+        self.test_sound_button = QPushButton("Tes Suara")
         self.test_sound_button.clicked.connect(self.test_sound)
         self.test_sound_button.setEnabled(selected_sound is not None and use_custom_sound)
         
@@ -288,11 +356,11 @@ class CustomizeTab(QWidget):
         sound_group.setLayout(sound_layout)
         
         # Preview button
-        preview_button = QPushButton("Preview Reminder")
+        preview_button = QPushButton("Test Notifikasi")
         preview_button.clicked.connect(self.preview_reminder)
         
         # Save settings button
-        save_button = QPushButton("Save Settings")
+        save_button = QPushButton("Simpan setting")
         save_button.clicked.connect(self.save_settings)
         
         # Add everything to the main layout
@@ -319,14 +387,14 @@ class CustomizeTab(QWidget):
         global selected_image
         file_dialog = QFileDialog()
         file_path, _ = file_dialog.getOpenFileName(
-            self, "Select Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.webp)"
+            self, "Pilih Gambar", "", "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.webp)"
         )
         if file_path:
             # Copy file to custom directory
             destination = CUSTOM_IMG_PATH / os.path.basename(file_path)
             shutil.copy2(file_path, destination)
             selected_image = str(destination)
-            self.selected_image_label.setText(f"Selected: {os.path.basename(selected_image)}")
+            self.selected_image_label.setText(f"Terpilih: {os.path.basename(selected_image)}")
             pixmap = QPixmap(selected_image)
             self.image_preview.setPixmap(pixmap.scaled(180, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation))
     
@@ -334,14 +402,14 @@ class CustomizeTab(QWidget):
         global selected_sound
         file_dialog = QFileDialog()
         file_path, _ = file_dialog.getOpenFileName(
-            self, "Select Sound", "", "Sound Files (*.mp3 *.wav)"
+            self, "Pilih Suara", "", "Sound Files (*.mp3 *.wav)"
         )
         if file_path:
             # Copy file to custom directory
             destination = CUSTOM_SOUND_PATH / os.path.basename(file_path)
             shutil.copy2(file_path, destination)
             selected_sound = str(destination)
-            self.selected_sound_label.setText(f"Selected: {os.path.basename(selected_sound)}")
+            self.selected_sound_label.setText(f"Terpilih: {os.path.basename(selected_sound)}")
             self.test_sound_button.setEnabled(True)
     
     def test_sound(self):
