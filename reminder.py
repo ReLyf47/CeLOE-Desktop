@@ -3,12 +3,14 @@ import threading
 import time
 import random
 import os
+import shutil
 from datetime import datetime, timedelta
 from plyer import notification
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout,
     QVBoxLayout, QPushButton, QListWidget, QDateTimeEdit, QMessageBox,
-    QComboBox, QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit, QTabWidget, QAction
+    QComboBox, QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit, QTabWidget, QAction,
+    QFileDialog, QGroupBox, QRadioButton, QScrollArea
 )
 from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize, QTime, QObject, pyqtSignal
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -23,8 +25,18 @@ BASE_DIR = Path(__file__).resolve().parent
 CHAR_IMG_PATH = BASE_DIR / "chara"
 ALARM_SOUND_PATH = BASE_DIR / "alarm"
 ICON_PATH = BASE_DIR / "img" / "icon.png"
+CUSTOM_IMG_PATH = BASE_DIR / "custom_images"
+CUSTOM_SOUND_PATH = BASE_DIR / "custom_sounds"
+
+# Ensure custom directories exist
+CUSTOM_IMG_PATH.mkdir(exist_ok=True)
+CUSTOM_SOUND_PATH.mkdir(exist_ok=True)
 
 reminders = []
+use_custom_image = False
+use_custom_sound = False
+selected_image = None
+selected_sound = None
 
 class ImagePopup(QWidget):
     def __init__(self, image_path):
@@ -69,6 +81,9 @@ def get_dark_stylesheet():
     QPushButton:hover { background-color: #3a3a3a; }
     QLineEdit, QDateTimeEdit, QTimeEdit, QListWidget { background-color: #1f1f1f; color: white; border: 1px solid #555; border-radius: 4px; }
     QLabel { font-weight: bold; }
+    QRadioButton { color: #e0e0e0; }
+    QGroupBox { border: 1px solid #555; border-radius: 4px; margin-top: 1ex; padding-top: 10px; }
+    QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top center; padding: 0 3px; }
     """
 
 def get_light_stylesheet():
@@ -78,6 +93,8 @@ def get_light_stylesheet():
     QPushButton:hover { background-color: #0b5ed7; }
     QLineEdit, QDateTimeEdit, QTimeEdit { padding: 6px; border: 1px solid #ced4da; border-radius: 4px; }
     QLabel { font-weight: bold; }
+    QGroupBox { border: 1px solid #ced4da; border-radius: 4px; margin-top: 1ex; padding-top: 10px; }
+    QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top center; padding: 0 3px; }
     """
 
 class ReminderTab(QWidget):
@@ -201,6 +218,163 @@ class BrowserTab(QWidget):
         layout.addWidget(self.browser)
         self.setLayout(layout)
 
+class CustomizeTab(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout()
+        
+        # Images section
+        image_group = QGroupBox("Image Settings")
+        image_layout = QVBoxLayout()
+        
+        self.default_image_radio = QRadioButton("Use Default Images")
+        self.default_image_radio.setChecked(not use_custom_image)
+        self.default_image_radio.toggled.connect(self.toggle_image_source)
+        
+        self.custom_image_radio = QRadioButton("Use Custom Image")
+        self.custom_image_radio.setChecked(use_custom_image)
+        
+        self.select_image_button = QPushButton("Select Custom Image")
+        self.select_image_button.clicked.connect(self.select_custom_image)
+        self.select_image_button.setEnabled(use_custom_image)
+        
+        self.selected_image_label = QLabel("No custom image selected")
+        if selected_image:
+            self.selected_image_label.setText(f"Selected: {os.path.basename(selected_image)}")
+        
+        self.image_preview = QLabel()
+        self.image_preview.setFixedSize(200, 200)
+        self.image_preview.setAlignment(Qt.AlignCenter)
+        self.image_preview.setStyleSheet("border: 1px solid #ccc;")
+        if selected_image and os.path.exists(selected_image):
+            pixmap = QPixmap(selected_image)
+            self.image_preview.setPixmap(pixmap.scaled(180, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        
+        image_layout.addWidget(self.default_image_radio)
+        image_layout.addWidget(self.custom_image_radio)
+        image_layout.addWidget(self.select_image_button)
+        image_layout.addWidget(self.selected_image_label)
+        image_layout.addWidget(self.image_preview)
+        image_group.setLayout(image_layout)
+        
+        # Sound section
+        sound_group = QGroupBox("Sound Settings")
+        sound_layout = QVBoxLayout()
+        
+        self.default_sound_radio = QRadioButton("Use Default Sounds")
+        self.default_sound_radio.setChecked(not use_custom_sound)
+        self.default_sound_radio.toggled.connect(self.toggle_sound_source)
+        
+        self.custom_sound_radio = QRadioButton("Use Custom Sound")
+        self.custom_sound_radio.setChecked(use_custom_sound)
+        
+        self.select_sound_button = QPushButton("Select Custom Sound")
+        self.select_sound_button.clicked.connect(self.select_custom_sound)
+        self.select_sound_button.setEnabled(use_custom_sound)
+        
+        self.selected_sound_label = QLabel("No custom sound selected")
+        if selected_sound:
+            self.selected_sound_label.setText(f"Selected: {os.path.basename(selected_sound)}")
+        
+        self.test_sound_button = QPushButton("Test Sound")
+        self.test_sound_button.clicked.connect(self.test_sound)
+        self.test_sound_button.setEnabled(selected_sound is not None and use_custom_sound)
+        
+        sound_layout.addWidget(self.default_sound_radio)
+        sound_layout.addWidget(self.custom_sound_radio)
+        sound_layout.addWidget(self.select_sound_button)
+        sound_layout.addWidget(self.selected_sound_label)
+        sound_layout.addWidget(self.test_sound_button)
+        sound_group.setLayout(sound_layout)
+        
+        # Preview button
+        preview_button = QPushButton("Preview Reminder")
+        preview_button.clicked.connect(self.preview_reminder)
+        
+        # Save settings button
+        save_button = QPushButton("Save Settings")
+        save_button.clicked.connect(self.save_settings)
+        
+        # Add everything to the main layout
+        layout.addWidget(image_group)
+        layout.addWidget(sound_group)
+        layout.addWidget(preview_button)
+        layout.addWidget(save_button)
+        layout.addStretch()
+        
+        self.setLayout(layout)
+    
+    def toggle_image_source(self, checked):
+        global use_custom_image
+        use_custom_image = not checked
+        self.select_image_button.setEnabled(use_custom_image)
+    
+    def toggle_sound_source(self, checked):
+        global use_custom_sound
+        use_custom_sound = not checked
+        self.select_sound_button.setEnabled(use_custom_sound)
+        self.test_sound_button.setEnabled(use_custom_sound and selected_sound is not None)
+    
+    def select_custom_image(self):
+        global selected_image
+        file_dialog = QFileDialog()
+        file_path, _ = file_dialog.getOpenFileName(
+            self, "Select Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.webp)"
+        )
+        if file_path:
+            # Copy file to custom directory
+            destination = CUSTOM_IMG_PATH / os.path.basename(file_path)
+            shutil.copy2(file_path, destination)
+            selected_image = str(destination)
+            self.selected_image_label.setText(f"Selected: {os.path.basename(selected_image)}")
+            pixmap = QPixmap(selected_image)
+            self.image_preview.setPixmap(pixmap.scaled(180, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+    
+    def select_custom_sound(self):
+        global selected_sound
+        file_dialog = QFileDialog()
+        file_path, _ = file_dialog.getOpenFileName(
+            self, "Select Sound", "", "Sound Files (*.mp3 *.wav)"
+        )
+        if file_path:
+            # Copy file to custom directory
+            destination = CUSTOM_SOUND_PATH / os.path.basename(file_path)
+            shutil.copy2(file_path, destination)
+            selected_sound = str(destination)
+            self.selected_sound_label.setText(f"Selected: {os.path.basename(selected_sound)}")
+            self.test_sound_button.setEnabled(True)
+    
+    def test_sound(self):
+        if selected_sound and os.path.exists(selected_sound):
+            try:
+                pygame.mixer.music.load(selected_sound)
+                pygame.mixer.music.play()
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Failed to play sound: {e}")
+    
+    def preview_reminder(self):
+        notification.notify(title="Test Reminder", message="This is a test reminder", timeout=10)
+        
+        if use_custom_sound and selected_sound:
+            try:
+                pygame.mixer.music.load(selected_sound)
+                pygame.mixer.music.play()
+            except Exception as e:
+                print(f"Error playing sound: {e}")
+        else:
+            play_alarm()
+        
+        if use_custom_image and selected_image:
+            popup_manager.show_image_signal.emit(selected_image)
+        else:
+            show_image()
+    
+    def save_settings(self):
+        global use_custom_image, use_custom_sound
+        use_custom_image = self.custom_image_radio.isChecked()
+        use_custom_sound = self.custom_sound_radio.isChecked()
+        QMessageBox.information(self, "Success", "Settings saved successfully!")
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -210,8 +384,10 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
         self.reminder_tab = ReminderTab()
         self.celoe_tab = BrowserTab()
+        self.customize_tab = CustomizeTab()
         self.tabs.addTab(self.reminder_tab, "Reminder")
         self.tabs.addTab(self.celoe_tab, "CeLOE")
+        self.tabs.addTab(self.customize_tab, "Customize")
 
         self.dark_mode = False
 
@@ -233,27 +409,34 @@ class MainWindow(QMainWindow):
 
 def play_alarm():
     try:
-        sounds = [os.path.join(ALARM_SOUND_PATH, f) for f in os.listdir(ALARM_SOUND_PATH)
-                  if f.endswith(".mp3") or f.endswith(".wav")]
-        if not sounds:
-            print("No alarm sound found.")
-            return
-        sound_file = random.choice(sounds)
-        pygame.mixer.music.load(sound_file)
-        pygame.mixer.music.play()
+        if use_custom_sound and selected_sound and os.path.exists(selected_sound):
+            pygame.mixer.music.load(selected_sound)
+            pygame.mixer.music.play()
+        else:
+            sounds = [os.path.join(ALARM_SOUND_PATH, f) for f in os.listdir(ALARM_SOUND_PATH)
+                    if f.endswith(".mp3") or f.endswith(".wav")]
+            if not sounds:
+                print("No alarm sound found.")
+                return
+            sound_file = random.choice(sounds)
+            pygame.mixer.music.load(sound_file)
+            pygame.mixer.music.play()
     except Exception as e:
         print(f"Error playing sound: {e}")
 
 def show_image():
     global popup_manager
     try:
-        images = [os.path.join(CHAR_IMG_PATH, f) for f in os.listdir(CHAR_IMG_PATH)
-                  if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp'))]
-        if not images:
-            print("No character images found.")
-            return
-        image_file = random.choice(images)
-        popup_manager.show_image_signal.emit(image_file)
+        if use_custom_image and selected_image and os.path.exists(selected_image):
+            popup_manager.show_image_signal.emit(selected_image)
+        else:
+            images = [os.path.join(CHAR_IMG_PATH, f) for f in os.listdir(CHAR_IMG_PATH)
+                    if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp'))]
+            if not images:
+                print("No character images found.")
+                return
+            image_file = random.choice(images)
+            popup_manager.show_image_signal.emit(image_file)
     except Exception as e:
         print(f"Error showing image: {e}")
 
