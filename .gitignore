@@ -2,3 +2,5 @@ browser_cache/
 browser_storage/
 tempCodeRunnerFile.py
 custom_*/
+__pycache__/
+.git/
