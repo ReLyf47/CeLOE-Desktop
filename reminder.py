@@ -23,14 +23,18 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 CHAR_IMG_PATH = BASE_DIR / "chara"
+ALARM_24H_PATH = BASE_DIR / "alarm24"
+ALARM_1H_PATH = BASE_DIR / "alarm1" 
 ALARM_SOUND_PATH = BASE_DIR / "alarm"
 ICON_PATH = BASE_DIR / "img" / "icon.png"
 CUSTOM_IMG_PATH = BASE_DIR / "custom_images"
 CUSTOM_SOUND_PATH = BASE_DIR / "custom_sounds"
 
-# Ensure custom directories exist
 CUSTOM_IMG_PATH.mkdir(exist_ok=True)
 CUSTOM_SOUND_PATH.mkdir(exist_ok=True)
+ALARM_SOUND_PATH.mkdir(exist_ok=True)
+ALARM_24H_PATH.mkdir(exist_ok=True)
+ALARM_1H_PATH.mkdir(exist_ok=True)
 
 reminders = []
 use_custom_image = False
@@ -44,58 +48,39 @@ class ImagePopup(QWidget):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setStyleSheet("background-color: transparent;")
-
         layout = QVBoxLayout()
         self.image_label = QLabel()
         layout.addWidget(self.image_label)
         self.setLayout(layout)
-
-        # Handle different image types
         if image_path.lower().endswith('.gif'):
             self.movie = QMovie(image_path)
             self.movie.frameChanged.connect(self.adjust_size)
             self.image_label.setMovie(self.movie)
             self.movie.start()
         else:
-            # Handle static images
             self.pixmap = QPixmap(image_path)
             self.adjust_size()
-
-        # Center the window
         self.center_on_screen()
-        
-        # Close after 10 seconds
         self.timer = threading.Timer(10.0, self.close)
         self.timer.start()
 
     def adjust_size(self, frame_num=0):
-        """Adjust window size based on image dimensions"""
         if hasattr(self, 'movie'):
-            # For animated GIFs
             size = self.movie.currentImage().size()
             if not size.isValid():
                 return
         else:
-            # For static images
             size = self.pixmap.size()
             if not size.isValid():
                 return
-
-        # Get screen dimensions
         screen = QApplication.primaryScreen().availableGeometry()
-        max_width = screen.width() * 0.8  # Max 80% of screen width
-        max_height = screen.height() * 0.8  # Max 80% of screen height
-
-        # Calculate target size maintaining aspect ratio
+        max_width = screen.width() * 0.8
+        max_height = screen.height() * 0.8
         width = size.width()
         height = size.height()
         aspect = width / height
-
-        # Ensure minimum size of 300px
         width = max(width, 300)
         height = max(height, 300)
-        
-        # Scale down if too large for screen
         if width > max_width or height > max_height:
             if width / max_width > height / max_height:
                 width = max_width
@@ -103,8 +88,6 @@ class ImagePopup(QWidget):
             else:
                 height = max_height
                 width = height * aspect
-
-        # Set the image and window size
         if hasattr(self, 'movie'):
             self.movie.setScaledSize(QSize(int(width), int(height)))
             self.image_label.setFixedSize(int(width), int(height))
@@ -114,12 +97,10 @@ class ImagePopup(QWidget):
                                              Qt.SmoothTransformation)
             self.image_label.setPixmap(scaled_pixmap)
             self.image_label.setFixedSize(int(width), int(height))
-
         self.resize(int(width), int(height))
         self.center_on_screen()
 
     def center_on_screen(self):
-        """Center the window on screen"""
         screen = QApplication.primaryScreen().availableGeometry()
         size = self.size()
         self.move(
@@ -129,7 +110,6 @@ class ImagePopup(QWidget):
 
 class PopupManager(QObject):
     show_image_signal = pyqtSignal(str)
-
     def __init__(self):
         super().__init__()
         self.show_image_signal.connect(self._show_image_popup)
@@ -140,7 +120,7 @@ class PopupManager(QObject):
         popup.raise_()
         popup.activateWindow()
 
-popup_manager = None  # Global reference
+popup_manager = None 
 
 def get_dark_stylesheet():
     return """
@@ -171,42 +151,32 @@ class ReminderTab(QWidget):
         self.setWindowTitle("CeLOE Reminder App")
         self.setMinimumSize(500, 600)
         self.layout = QVBoxLayout()
-
         title_label = QLabel("Judul Pengingat:")
         self.title_input = QLineEdit()
         self.title_input.setPlaceholderText("Reminder Title")
-
         datetime_label = QLabel("Tanggal & Waktu:")
         datetime_frame = QHBoxLayout()
-
         self.date_input = QDateTimeEdit()
         self.date_input.setDisplayFormat("dd/MM/yyyy")
         self.date_input.setCalendarPopup(True)
         self.date_input.setDate(QDateTime.currentDateTime().date())
-
         self.time_input = QTimeEdit()
         self.time_input.setDisplayFormat("HH:mm:ss")
         self.time_input.setTime(QDateTime.currentDateTime().time())
         self.time_input.setTimeRange(QTime(0, 0, 0), QTime(23, 59, 59))
         self.time_input.setButtonSymbols(QTimeEdit.PlusMinus)
         self.time_input.setCalendarPopup(True)
-
         datetime_frame.addWidget(self.date_input)
         datetime_frame.addWidget(self.time_input)
-
         self.add_button = QPushButton("Tambah Reminder")
         self.add_button.clicked.connect(self.add_reminder)
-
         self.edit_button = QPushButton("Edit Reminder")
         self.edit_button.clicked.connect(self.edit_reminder)
-
         self.delete_button = QPushButton("Hapus Reminder")
         self.delete_button.clicked.connect(self.delete_reminder)
-
         list_label = QLabel("Daftar Reminder:")
         self.reminder_list = QListWidget()
         self.reminder_list.itemClicked.connect(self.on_select)
-
         self.layout.addWidget(title_label)
         self.layout.addWidget(self.title_input)
         self.layout.addWidget(datetime_label)
@@ -216,7 +186,6 @@ class ReminderTab(QWidget):
         self.layout.addWidget(self.delete_button)
         self.layout.addWidget(list_label)
         self.layout.addWidget(self.reminder_list)
-
         self.setLayout(self.layout)
         pygame.mixer.init()
 
@@ -290,26 +259,19 @@ class CustomizeTab(QWidget):
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout()
-        
-        # Images section
         image_group = QGroupBox("Setting Notifikasi")
         image_layout = QVBoxLayout()
-        
         self.default_image_radio = QRadioButton("Gunakan gambar Default")
         self.default_image_radio.setChecked(not use_custom_image)
         self.default_image_radio.toggled.connect(self.toggle_image_source)
-        
         self.custom_image_radio = QRadioButton("Gunakan gamber Custom")
         self.custom_image_radio.setChecked(use_custom_image)
-        
         self.select_image_button = QPushButton("Pilih gambar")
         self.select_image_button.clicked.connect(self.select_custom_image)
         self.select_image_button.setEnabled(use_custom_image)
-        
         self.selected_image_label = QLabel("Gambar tidak ada yang dipilih")
         if selected_image:
             self.selected_image_label.setText(f"Terpilih: {os.path.basename(selected_image)}")
-        
         self.image_preview = QLabel()
         self.image_preview.setFixedSize(200, 200)
         self.image_preview.setAlignment(Qt.AlignCenter)
@@ -317,59 +279,43 @@ class CustomizeTab(QWidget):
         if selected_image and os.path.exists(selected_image):
             pixmap = QPixmap(selected_image)
             self.image_preview.setPixmap(pixmap.scaled(180, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        
         image_layout.addWidget(self.default_image_radio)
         image_layout.addWidget(self.custom_image_radio)
         image_layout.addWidget(self.select_image_button)
         image_layout.addWidget(self.selected_image_label)
         image_layout.addWidget(self.image_preview)
         image_group.setLayout(image_layout)
-        
-        # Sound section
         sound_group = QGroupBox("Setting suara")
         sound_layout = QVBoxLayout()
-        
         self.default_sound_radio = QRadioButton("Gunakan suara Default")
         self.default_sound_radio.setChecked(not use_custom_sound)
         self.default_sound_radio.toggled.connect(self.toggle_sound_source)
-        
         self.custom_sound_radio = QRadioButton("Gunakan suara Custom")
         self.custom_sound_radio.setChecked(use_custom_sound)
-        
         self.select_sound_button = QPushButton("Pilih suara")
         self.select_sound_button.clicked.connect(self.select_custom_sound)
         self.select_sound_button.setEnabled(use_custom_sound)
-        
         self.selected_sound_label = QLabel("Tidak ada suara yang dipilih")
         if selected_sound:
             self.selected_sound_label.setText(f"Terpilih: {os.path.basename(selected_sound)}")
-        
         self.test_sound_button = QPushButton("Tes Suara")
         self.test_sound_button.clicked.connect(self.test_sound)
         self.test_sound_button.setEnabled(selected_sound is not None and use_custom_sound)
-        
         sound_layout.addWidget(self.default_sound_radio)
         sound_layout.addWidget(self.custom_sound_radio)
         sound_layout.addWidget(self.select_sound_button)
         sound_layout.addWidget(self.selected_sound_label)
         sound_layout.addWidget(self.test_sound_button)
         sound_group.setLayout(sound_layout)
-        
-        # Preview button
         preview_button = QPushButton("Test Notifikasi")
         preview_button.clicked.connect(self.preview_reminder)
-        
-        # Save settings button
         save_button = QPushButton("Simpan setting")
         save_button.clicked.connect(self.save_settings)
-        
-        # Add everything to the main layout
         layout.addWidget(image_group)
         layout.addWidget(sound_group)
         layout.addWidget(preview_button)
         layout.addWidget(save_button)
         layout.addStretch()
-        
         self.setLayout(layout)
     
     def toggle_image_source(self, checked):
@@ -390,7 +336,6 @@ class CustomizeTab(QWidget):
             self, "Pilih Gambar", "", "Image Files (*.png *.jpg *.jpeg *.bmp *.gif *.webp)"
         )
         if file_path:
-            # Copy file to custom directory
             destination = CUSTOM_IMG_PATH / os.path.basename(file_path)
             shutil.copy2(file_path, destination)
             selected_image = str(destination)
@@ -422,7 +367,6 @@ class CustomizeTab(QWidget):
     
     def preview_reminder(self):
         notification.notify(title="Test Reminder", message="This is a test reminder", timeout=10)
-        
         if use_custom_sound and selected_sound:
             try:
                 pygame.mixer.music.load(selected_sound)
@@ -475,20 +419,28 @@ class MainWindow(QMainWindow):
         stylesheet = get_dark_stylesheet() if self.dark_mode else get_light_stylesheet()
         self.setStyleSheet(stylesheet)
 
-def play_alarm():
+def play_alarm(alarm_type="regular"):
     try:
         if use_custom_sound and selected_sound and os.path.exists(selected_sound):
             pygame.mixer.music.load(selected_sound)
             pygame.mixer.music.play()
-        else:
-            sounds = [os.path.join(ALARM_SOUND_PATH, f) for f in os.listdir(ALARM_SOUND_PATH)
-                    if f.endswith(".mp3") or f.endswith(".wav")]
-            if not sounds:
-                print("No alarm sound found.")
-                return
-            sound_file = random.choice(sounds)
-            pygame.mixer.music.load(sound_file)
-            pygame.mixer.music.play()
+            return
+        if alarm_type == "24h":
+            sound_folder = ALARM_24H_PATH
+        elif alarm_type == "1h":
+            sound_folder = ALARM_1H_PATH
+        else:  # regular
+            sound_folder = ALARM_SOUND_PATH
+        sounds = []
+        if sound_folder.exists():
+            sounds = [os.path.join(sound_folder, f) for f in os.listdir(sound_folder)
+                     if f.endswith(".mp3") or f.endswith(".wav")]
+        if not sounds:
+            print(f"No {alarm_type} alarm sounds found in {sound_folder}")
+            return
+        sound_file = random.choice(sounds)
+        pygame.mixer.music.load(sound_file)
+        pygame.mixer.music.play()
     except Exception as e:
         print(f"Error playing sound: {e}")
 
@@ -511,21 +463,34 @@ def show_image():
 def schedule_notification(title, dt):
     def notify():
         notification.notify(title="Reminder", message=title, timeout=10)
-        play_alarm()
+        play_alarm("regular")
         show_image()
-    def notify_early():
-        notification.notify(title="Upcoming Reminder", message=f"{title} in 24 hours", timeout=10)
-        play_alarm()
+        
+    def notify_24h():
+        notification.notify(title="Upcoming Reminder (24h)", message=f"{title} in 24 hours", timeout=10)
+        play_alarm("24h")
         show_image()
-    delay = (dt - datetime.now()).total_seconds()
-    early_time = dt - timedelta(hours=24)
-    if early_time > datetime.now():
-        schedule.every(1).seconds.do(lambda: check_time(early_time, notify_early)).tag(title + "_early")
+        
+    def notify_1h():
+        notification.notify(title="Upcoming Reminder (1h)", message=f"{title} in 1 hour", timeout=10)
+        play_alarm("1h")
+        show_image()
+
+    early_24h_time = dt - timedelta(hours=24)
+    early_1h_time = dt - timedelta(hours=1)
+    
+    if early_24h_time > datetime.now():
+        schedule.every(1).seconds.do(lambda: check_time(early_24h_time, notify_24h)).tag(title + "_24h")
+    
+    if early_1h_time > datetime.now():
+        schedule.every(1).seconds.do(lambda: check_time(early_1h_time, notify_1h)).tag(title + "_1h")
+    
     schedule.every(1).seconds.do(lambda: check_time(dt, notify)).tag(title)
 
 def cancel_scheduled(title):
     schedule.clear(title)
-    schedule.clear(title + "_early")
+    schedule.clear(title + "_24h")
+    schedule.clear(title + "_1h")
 
 def check_time(target_time, callback):
     if datetime.now() >= target_time:
