@@ -258,7 +258,7 @@ class CustomizeTab(QWidget):
         layout = QVBoxLayout()
         image_group = QGroupBox("Setting Notifikasi")
         image_layout = QVBoxLayout()
-        self.default_image_radio = QRadioButton("Gunakan gambar Default")
+        self.default_image_radio = QRadioButton("Gunakan gambar Random")
         self.default_image_radio.setChecked(not use_custom_image)
         self.default_image_radio.toggled.connect(self.toggle_image_source)
         self.custom_image_radio = QRadioButton("Gunakan gamber Custom")
@@ -284,7 +284,7 @@ class CustomizeTab(QWidget):
         image_group.setLayout(image_layout)
         sound_group = QGroupBox("Setting suara")
         sound_layout = QVBoxLayout()
-        self.default_sound_radio = QRadioButton("Gunakan suara Default")
+        self.default_sound_radio = QRadioButton("Gunakan suara Random")
         self.default_sound_radio.setChecked(not use_custom_sound)
         self.default_sound_radio.toggled.connect(self.toggle_sound_source)
         self.custom_sound_radio = QRadioButton("Gunakan suara Custom")
@@ -551,7 +551,7 @@ def auto_delete_old_reminders(window):
         for i in reversed(to_delete):
             del reminders[i]
             window.reminder_tab.reminder_list.takeItem(i)
-        time.sleep(5)
+        time.sleep(5) #h
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
