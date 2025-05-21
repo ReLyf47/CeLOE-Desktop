@@ -492,7 +492,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CELOE Reminder App")
-        self.setMinimumSize(900, 600)
+        self.setMinimumSize(720, 720)
 
         # Central widget untuk ganti konten
         self.central_widget = QWidget()
