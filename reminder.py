@@ -316,7 +316,7 @@ class CustomizeTab(QWidget):
             QGroupBox { border: 1px solid #bbb; border-radius: 8px; margin-top: 8px; padding: 12px; }
         """)
         image_layout = QVBoxLayout()
-        self.default_image_radio = QRadioButton("Gunakan gambar Random")
+        self.default_image_radio = QRadioButton("Gunakan gambar Default")
         self.default_image_radio.setChecked(not use_custom_image)
         self.default_image_radio.toggled.connect(self.toggle_image_source)
         self.custom_image_radio = QRadioButton("Gunakan gambar Custom")
@@ -352,7 +352,7 @@ class CustomizeTab(QWidget):
             QGroupBox { border: 1px solid #bbb; border-radius: 8px; margin-top: 8px; padding: 12px; }
         """)
         sound_layout = QVBoxLayout()
-        self.default_sound_radio = QRadioButton("Gunakan suara Random")
+        self.default_sound_radio = QRadioButton("Gunakan suara Default")
         self.default_sound_radio.setChecked(not use_custom_sound)
         self.default_sound_radio.toggled.connect(self.toggle_sound_source)
         self.custom_sound_radio = QRadioButton("Gunakan suara Custom")
