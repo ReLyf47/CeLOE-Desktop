@@ -18,6 +18,7 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtGui import QIcon, QPixmap, QMovie, QPainter, QColor, QPen
 from pathlib import Path
 
+# Constants and Paths
 BASE_DIR = Path(__file__).resolve().parent
 CHAR_IMG_PATH = BASE_DIR / "chara"
 ALARM_24H_PATH = BASE_DIR / "alarm24"
@@ -27,17 +28,19 @@ ICON_PATH = BASE_DIR / "img" / "icon.png"
 CUSTOM_IMG_PATH = BASE_DIR / "custom_images"
 CUSTOM_SOUND_PATH = BASE_DIR / "custom_sounds"
 
-CUSTOM_IMG_PATH.mkdir(exist_ok=True)
-CUSTOM_SOUND_PATH.mkdir(exist_ok=True)
-ALARM_SOUND_PATH.mkdir(exist_ok=True)
-ALARM_24H_PATH.mkdir(exist_ok=True)
-ALARM_1H_PATH.mkdir(exist_ok=True)
+directories = [
+    CUSTOM_IMG_PATH, CUSTOM_SOUND_PATH, ALARM_SOUND_PATH,
+    ALARM_24H_PATH, ALARM_1H_PATH
+]
+for directory in directories:
+    directory.mkdir(exist_ok=True)
 
 reminders = []
 use_custom_image = False
 use_custom_sound = False
 selected_image = None
 selected_sound = None
+popup_manager = None
 
 class ImagePopup(QWidget):
     def __init__(self, image_path):
@@ -116,8 +119,6 @@ class PopupManager(QObject):
         popup.show()
         popup.raise_()
         popup.activateWindow()
-
-popup_manager = None 
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -236,8 +237,10 @@ class MainWindow(QMainWindow):
             painter.setBrush(QColor("#b00"))
         
         painter.setPen(Qt.NoPen)
+        # Use the animated position for smooth movement
         x = 4 + (self.theme_toggle.toggle_position * 26)
-        painter.drawEllipse(x, 4, 16, 16)
+        painter.drawEllipse(int(x), 4, 16, 16)
+        self.theme_toggle.update()  # Force redraw during animation
 
     def toggle_theme(self):
         self.dark_mode = not self.dark_mode
@@ -267,11 +270,33 @@ class MainWindow(QMainWindow):
         for i, btn in enumerate(self.tab_buttons):
             if i == self.active_tab_index:
                 btn.setStyleSheet("""
-                    background: #ffeaea; border: none; padding: 12px 8px; font-weight: bold; font-size: 14px; color: #b00; text-align: left; border-radius: 8px;
+                    QPushButton {
+                        background: #fde8e7;
+                        border: none;
+                        padding: 12px 24px;
+                        font-weight: 600;
+                        font-size: 14px;
+                        color: #E74C3C;
+                        text-align: left;
+                        border-radius: 8px;
+                    }
                 """)
             else:
                 btn.setStyleSheet("""
-                    background: transparent; border: none; padding: 12px 8px; font-weight: bold; font-size: 14px; color: #b00; text-align: left;
+                    QPushButton {
+                        background: transparent;
+                        border: none;
+                        padding: 12px 24px;
+                        font-weight: 500;
+                        font-size: 14px;
+                        color: #95a5a6;
+                        text-align: left;
+                    }
+                    QPushButton:hover {
+                        background: #f8f9fa;
+                        color: #E74C3C;
+                        border-radius: 8px;
+                    }
                 """)
 
     def apply_theme(self):
@@ -297,25 +322,166 @@ class MainWindow(QMainWindow):
 
 def get_dark_stylesheet():
     return """
-    QWidget { background-color: #121212; color: #e0e0e0; font-family: Segoe UI, Arial; font-size: 10pt; }
-    QPushButton { background-color: #b00; color: white; border: none; padding: 8px; border-radius: 4px; }
-    QPushButton:hover { background-color: #d32f2f; }
-    QLineEdit, QDateTimeEdit, QTimeEdit, QListWidget { background-color: #1f1f1f; color: white; border: 1px solid #555; border-radius: 4px; }
-    QLabel { font-weight: bold; }
-    QRadioButton { color: #e0e0e0; }
-    QGroupBox { border: 1px solid #555; border-radius: 4px; margin-top: 1ex; padding-top: 10px; }
-    QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top center; padding: 0 3px; }
+    QWidget { 
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        font-size: 10pt;
+        color: #e0e0e0;
+        background: #1a1a1a;
+    }
+    QPushButton { 
+        background-color: #E74C3C;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: 500;
+    }
+    QPushButton:hover { 
+        background-color: #d63026;
+        transition: background-color 0.2s;
+    }
+    QLineEdit, QDateTimeEdit, QTimeEdit { 
+        padding: 10px;
+        border: 2px solid #333333;
+        border-radius: 8px;
+        background: #262626;
+        color: #e0e0e0;
+    }
+    QLineEdit:focus, QDateTimeEdit:focus, QTimeEdit:focus {
+        border: 2px solid #E74C3C;
+        background: #2d2d2d;
+    }
+    QLabel { 
+        font-weight: 500;
+        color: #e0e0e0;
+    }
+    QListWidget {
+        border: 2px solid #333333;
+        border-radius: 8px;
+        padding: 10px;
+        background: #262626;
+        color: #e0e0e0;
+    }
+    QListWidget::item {
+        padding: 8px;
+        border-radius: 4px;
+        margin: 2px 0;
+    }
+    QListWidget::item:hover {
+        background: #333333;
+    }
+    QListWidget::item:selected {
+        background: #E74C3C33;
+        color: #E74C3C;
+    }
+    QGroupBox {
+        border: 2px solid #333333;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 5px;
+    }
+    QRadioButton {
+        color: #e0e0e0;
+        spacing: 8px;
+    }
+    QRadioButton::indicator {
+        width: 18px;
+        height: 18px;
+        border-radius: 10px;
+        border: 2px solid #666666;
+    }
+    QRadioButton::indicator:checked {
+        background-color: #E74C3C;
+        border: 2px solid #E74C3C;
+    }
+    QRadioButton::indicator:unchecked:hover {
+        border: 2px solid #E74C3C;
+    }
+    QScrollBar:vertical {
+        border: none;
+        background: #262626;
+        width: 10px;
+        margin: 0;
+    }
+    QScrollBar::handle:vertical {
+        background: #666666;
+        border-radius: 5px;
+        min-height: 20px;
+    }
+    QScrollBar::handle:vertical:hover {
+        background: #E74C3C;
+    }
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+        height: 0px;
+    }
+    QCalendarWidget {
+        background-color: #262626;
+        color: #e0e0e0;
+    }
+    QCalendarWidget QWidget {
+        alternate-background-color: #333333;
+    }
+    QCalendarWidget QAbstractItemView:enabled {
+        color: #e0e0e0;
+        background-color: #262626;
+        selection-background-color: #E74C3C;
+        selection-color: white;
+    }
+    QCalendarWidget QMenu {
+        background-color: #262626;
+        color: #e0e0e0;
+    }
     """
 
 def get_light_stylesheet():
     return """
-    QWidget { font-family: Segoe UI, Arial; font-size: 10pt; }
-    QPushButton { background-color: #b00; color: white; border: none; padding: 8px; border-radius: 4px; }
-    QPushButton:hover { background-color: #d32f2f; }
-    QLineEdit, QDateTimeEdit, QTimeEdit { padding: 6px; border: 1px solid #ced4da; border-radius: 4px; }
-    QLabel { font-weight: bold; }
-    QGroupBox { border: 1px solid #ced4da; border-radius: 4px; margin-top: 1ex; padding-top: 10px; }
-    QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top center; padding: 0 3px; }
+    QWidget { 
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        font-size: 10pt;
+        color: #2c3e50;
+        background: #ffffff;
+    }
+    QPushButton { 
+        background-color: #E74C3C;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: 500;
+    }
+    QPushButton:hover { 
+        background-color: #c0392b;
+        transition: background-color 0.2s;
+    }
+    QLineEdit, QDateTimeEdit, QTimeEdit { 
+        padding: 10px;
+        border: 2px solid #ecf0f1;
+        border-radius: 8px;
+        background: #f8f9fa;
+    }
+    QLineEdit:focus, QDateTimeEdit:focus, QTimeEdit:focus {
+        border: 2px solid #E74C3C;
+        background: white;
+    }
+    QLabel { 
+        font-weight: 500;
+        color: #2c3e52;
+    }
+    QListWidget {
+        border: 2px solid #ecf0f1;
+        border-radius: 8px;
+        padding: 10px;
+        background: #f8f9fa;
+    }
+    QListWidget::item {
+        padding: 8px;
+        border-radius: 4px;
+        margin: 2px 0;
+    }
+    QListWidget::item:selected {
+        background: #fde8e7;
+        color: #E74C3C;
+    }
     """
 
 class ReminderTab(QWidget):
@@ -390,7 +556,7 @@ class ReminderTab(QWidget):
                 border: 1px solid #bbb;
                 border-radius: 8px;
                 padding: 8px;
-                font-size: 13px;
+                font-size: 15px;
                 min-height: 180px;
             }
             QListWidget::item:selected {
@@ -475,106 +641,327 @@ class CustomizeTab(QWidget):
         super().__init__()
         layout = QVBoxLayout()
         layout.setContentsMargins(32, 24, 32, 24)
-        layout.setSpacing(18)
+        layout.setSpacing(24)
 
-        # Judul
-        title_label = QLabel("Reminder Customize Settings")
-        title_label.setStyleSheet("font-size: 20px; font-weight: bold; margin-bottom: 8px;")
-        layout.addWidget(title_label)
-
-        # Gambar
-        image_label = QLabel("Pengaturan Gambar Notifikasi")
-        image_label.setStyleSheet("font-size: 13px; font-weight: bold; margin-top: 8px;")
-        layout.addWidget(image_label)
-
-        image_group = QGroupBox()
-        image_group.setStyleSheet("""
-            QGroupBox { border: 1px solid #bbb; border-radius: 8px; margin-top: 8px; padding: 12px; }
+        # Header Section
+        header = QWidget()
+        header_layout = QVBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 16)
+        
+        title = QLabel("Customize")
+        title.setStyleSheet("""
+            font-size: 28px;
+            font-weight: bold;
+            color: #E74C3C;
         """)
+        subtitle = QLabel("Pilih gambar dan suara pengingat kamu, Nyalakan dulu untuk memilih gambar dan suara.")
+        subtitle.setStyleSheet("font-size: 14px; color: #95a5a6; margin-top: -4px;")
+        
+        header_layout.addWidget(title)
+        header_layout.addWidget(subtitle)
+        header.setLayout(header_layout)
+        layout.addWidget(header)
+
+        # Image Settings Card
+        image_card = QWidget()
+        image_card.setObjectName("settingsCard")
         image_layout = QVBoxLayout()
-        self.default_image_radio = QRadioButton("Gunakan gambar Random")
-        self.default_image_radio.setChecked(not use_custom_image)
-        self.default_image_radio.toggled.connect(self.toggle_image_source)
-        self.custom_image_radio = QRadioButton("Gunakan gambar Custom")
-        self.custom_image_radio.setChecked(use_custom_image)
-        self.select_image_button = QPushButton("Pilih gambar")
-        self.select_image_button.clicked.connect(self.select_custom_image)
-        self.select_image_button.setEnabled(use_custom_image)
-        self.selected_image_label = QLabel("Gambar tidak ada yang dipilih")
-        if selected_image:
-            self.selected_image_label.setText(f"Terpilih: {os.path.basename(selected_image)}")
+        image_layout.setSpacing(16)
+
+        # Image Header
+        image_header = QHBoxLayout()
+        image_icon = QLabel("🖼️")
+        image_icon.setStyleSheet("font-size: 24px;")
+        image_title = QLabel("Notification Image")
+        image_title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        image_header.addWidget(image_icon)
+        image_header.addWidget(image_title)
+        image_header.addStretch()
+
+        # Image Toggle Switch
+        self.image_switch = QWidget()
+        self.image_switch.setFixedSize(52, 26)
+        self.image_switch.toggle_position = 1 if use_custom_image else 0
+        self.image_switch.mousePressEvent = lambda e: self.toggle_image()
+        self.image_switch.paintEvent = lambda e: self.paint_switch(e, self.image_switch)
+        image_header.addWidget(self.image_switch)
+        
+        image_layout.addLayout(image_header)
+
+        # Image Preview Section
         self.image_preview = QLabel()
-        self.image_preview.setFixedSize(200, 200)
+        self.image_preview.setFixedSize(300, 200)
         self.image_preview.setAlignment(Qt.AlignCenter)
-        self.image_preview.setStyleSheet("border: 1px solid #ccc; border-radius: 6px;")
-        if selected_image and os.path.exists(selected_image):
-            pixmap = QPixmap(selected_image)
-            self.image_preview.setPixmap(pixmap.scaled(180, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        image_layout.addWidget(self.default_image_radio)
-        image_layout.addWidget(self.custom_image_radio)
-        image_layout.addWidget(self.select_image_button)
-        image_layout.addWidget(self.selected_image_label)
-        image_layout.addWidget(self.image_preview)
-        image_group.setLayout(image_layout)
-        layout.addWidget(image_group)
-
-        # Suara
-        sound_label = QLabel("Pengaturan Suara Notifikasi")
-        sound_label.setStyleSheet("font-size: 13px; font-weight: bold; margin-top: 8px;")
-        layout.addWidget(sound_label)
-
-        sound_group = QGroupBox()
-        sound_group.setStyleSheet("""
-            QGroupBox { border: 1px solid #bbb; border-radius: 8px; margin-top: 8px; padding: 12px; }
+        self.image_preview.setStyleSheet("""
+            QLabel {
+                background: #f8f9fa;
+                border: 2px dashed #dee2e6;
+                border-radius: 12px;
+            }
         """)
-        sound_layout = QVBoxLayout()
-        self.default_sound_radio = QRadioButton("Gunakan suara Random")
-        self.default_sound_radio.setChecked(not use_custom_sound)
-        self.default_sound_radio.toggled.connect(self.toggle_sound_source)
-        self.custom_sound_radio = QRadioButton("Gunakan suara Custom")
-        self.custom_sound_radio.setChecked(use_custom_sound)
-        self.select_sound_button = QPushButton("Pilih suara")
-        self.select_sound_button.clicked.connect(self.select_custom_sound)
-        self.select_sound_button.setEnabled(use_custom_sound)
-        self.selected_sound_label = QLabel("Tidak ada suara yang dipilih")
-        if selected_sound:
-            self.selected_sound_label.setText(f"Terpilih: {os.path.basename(selected_sound)}")
-        self.test_sound_button = QPushButton("Tes Suara")
-        self.test_sound_button.clicked.connect(self.test_sound)
-        self.test_sound_button.setEnabled(selected_sound is not None and use_custom_sound)
-        sound_layout.addWidget(self.default_sound_radio)
-        sound_layout.addWidget(self.custom_sound_radio)
-        sound_layout.addWidget(self.select_sound_button)
-        sound_layout.addWidget(self.selected_sound_label)
-        sound_layout.addWidget(self.test_sound_button)
-        sound_group.setLayout(sound_layout)
-        layout.addWidget(sound_group)
+        
+        # Image Selection Button
+        self.select_image_button = QPushButton("Choose Image")
+        self.select_image_button.setStyleSheet("""
+            QPushButton {
+                background: #E74C3C;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background: #c0392b;
+            }
+            QPushButton:disabled {
+                background: #bdc3c7;
+            }
+        """)
+        self.select_image_button.clicked.connect(self.select_custom_image)
+        
+        # Add selected image label
+        self.selected_image_label = QLabel("Belum ada gambar terpilih")
+        self.selected_image_label.setStyleSheet("""
+            color: #95a5a6;
+            font-size: 12px;
+            margin-top: 8px;
+        """)
+        
+        image_layout.addWidget(self.image_preview)
+        image_layout.addWidget(self.select_image_button)
+        image_layout.addWidget(self.selected_image_label)  # Add this line
+        image_card.setLayout(image_layout)
+        layout.addWidget(image_card)
 
-        # Tombol aksi
-        button_row = QHBoxLayout()
-        button_row.setSpacing(10)
-        preview_button = QPushButton("Test Notifikasi")
-        preview_button.clicked.connect(self.preview_reminder)
-        save_button = QPushButton("Simpan setting")
-        save_button.clicked.connect(self.save_settings)
-        button_row.addWidget(preview_button)
-        button_row.addWidget(save_button)
-        layout.addLayout(button_row)
+        # Sound Settings Card
+        sound_card = QWidget()
+        sound_card.setObjectName("settingsCard")
+        sound_layout = QVBoxLayout()
+        sound_layout.setSpacing(16)
+
+        # Sound Header
+        sound_header = QHBoxLayout()
+        sound_icon = QLabel("🔊")
+        sound_icon.setStyleSheet("font-size: 24px;")
+        sound_title = QLabel("Notification Sound")
+        sound_title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        sound_header.addWidget(sound_icon)
+        sound_header.addWidget(sound_title)
+        sound_header.addStretch()
+
+        # Sound Toggle Switch
+        self.sound_switch = QWidget()
+        self.sound_switch.setFixedSize(52, 26)
+        self.sound_switch.toggle_position = 1 if use_custom_sound else 0
+        self.sound_switch.mousePressEvent = lambda e: self.toggle_sound()
+        self.sound_switch.paintEvent = lambda e: self.paint_switch(e, self.sound_switch)
+        sound_header.addWidget(self.sound_switch)
+        
+        sound_layout.addLayout(sound_header)
+
+        # Sound Controls
+        sound_controls = QHBoxLayout()
+        self.select_sound_button = QPushButton("Choose Sound")
+        self.select_sound_button.setStyleSheet("""
+            QPushButton {
+                background: #E74C3C;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background: #c0392b;
+            }
+            QPushButton:disabled {
+                background: #bdc3c7;
+            }
+        """)
+        self.select_sound_button.clicked.connect(self.select_custom_sound)
+        
+        self.test_sound_button = QPushButton("Test Sound")
+        self.test_sound_button.setStyleSheet("""
+            QPushButton {
+                background: #f8f9fa;
+                color: #E74C3C;
+                border: 2px solid #E74C3C;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background: #fee2e2;
+            }
+            QPushButton:disabled {
+                border-color: #bdc3c7;
+                color: #bdc3c7;
+            }
+        """)
+        self.test_sound_button.clicked.connect(self.test_sound)
+        
+        sound_controls.addWidget(self.select_sound_button)
+        sound_controls.addWidget(self.test_sound_button)
+        
+        # Add selected sound label
+        self.selected_sound_label = QLabel("Belum ada suara terpilih")
+        self.selected_sound_label.setStyleSheet("""
+            color: #95a5a6;
+            font-size: 12px;
+            margin-top: 8px;
+        """)
+        
+        sound_layout.addLayout(sound_controls)
+        sound_layout.addWidget(self.selected_sound_label)  # Add this line
+        
+        sound_card.setLayout(sound_layout)
+        layout.addWidget(sound_card)
+
+        # Add global styles
+        self.setStyleSheet("""
+            QWidget#settingsCard {
+                border-radius: 16px;
+                padding: 24px;
+                margin: 8px 0;
+            }
+            QWidget#settingsCard[darkMode="true"] {
+                background: #262626;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            QWidget#settingsCard[darkMode="false"] {
+                background: white;
+                border: 1px solid rgba(0, 0, 0, 0.1);
+            }
+            QLabel[darkMode="true"] {
+                color: #e0e0e0;
+            }
+            QLabel[darkMode="false"] {
+                color: #2c3e50;
+            }
+            QLabel#imagePreview[darkMode="true"] {
+                background: #333333;
+                border: 2px dashed #404040;
+            }
+            QLabel#imagePreview[darkMode="false"] {
+                background: #f8f9fa;
+                border: 2px dashed #dee2e6;
+            }
+        """)
+
+        # Update image preview style
+        self.image_preview.setObjectName("imagePreview")
+        
+        # Add method to update dark mode
+        def update_dark_mode(self, is_dark):
+            # Update card properties
+            for card in [image_card, sound_card]:
+                card.setProperty("darkMode", is_dark)
+                card.style().unpolish(card)
+                card.style().polish(card)
+            
+            # Update labels
+            for label in self.findChildren(QLabel):
+                label.setProperty("darkMode", is_dark)
+                label.style().unpolish(label)
+                label.style().polish(label)
+            
+            # Update preview
+            self.image_preview.setProperty("darkMode", is_dark)
+            self.image_preview.style().unpolish(self.image_preview)
+            self.image_preview.style().polish(self.image_preview)
+
+            # Update title colors
+            title.setStyleSheet(f"""
+                font-size: 28px;
+                font-weight: bold;
+                color: #E74C3C;
+            """)
+            
+            # Update subtitle colors
+            subtitle.setStyleSheet(f"""
+                font-size: 14px;
+                color: {'#95a5a6' if not is_dark else '#777777'};
+                margin-top: -4px;
+            """)
+            
+            # Update buttons
+            buttons = [self.select_image_button, self.select_sound_button]
+            for btn in buttons:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background: #E74C3C;
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        font-weight: 500;
+                    }}
+                    QPushButton:hover {{
+                        background: #c0392b;
+                    }}
+                    QPushButton:disabled {{
+                        background: {'#404040' if is_dark else '#bdc3c7'};
+                    }}
+                """)
+            
+            # Update test sound button
+            self.test_sound_button.setStyleSheet(f"""
+                QPushButton {{
+                    background: {'#333333' if is_dark else '#f8f9fa'};
+                    color: #E74C3C;
+                    border: 2px solid #E74C3C;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-weight: 500;
+                }}
+                QPushButton:hover {{
+                    background: {'#404040' if is_dark else '#fee2e2'};
+                }}
+                QPushButton:disabled {{
+                    border-color: {'#404040' if is_dark else '#bdc3c7'};
+                    color: {'#404040' if is_dark else '#bdc3c7'};
+                }}
+            """)
+
+        # Connect to main window's dark mode toggle
+        self.update_dark_mode = update_dark_mode
 
         layout.addStretch()
         self.setLayout(layout)
-    
-    def toggle_image_source(self, checked):
+
+    def paint_switch(self, event, switch):
+        painter = QPainter(switch)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        # Draw background
+        painter.setPen(Qt.NoPen)
+        if switch.toggle_position == 1:
+            painter.setBrush(QColor("#E74C3C"))
+        else:
+            painter.setBrush(QColor("#bdc3c7"))
+        painter.drawRoundedRect(0, 0, 52, 26, 13, 13)
+        
+        # Draw toggle circle
+        painter.setBrush(QColor("white"))
+        x = 4 + (switch.toggle_position * 26)
+        painter.drawEllipse(int(x), 4, 18, 18)
+
+    def toggle_image(self):
         global use_custom_image
-        use_custom_image = not checked
+        use_custom_image = not use_custom_image
+        self.image_switch.toggle_position = 1 if use_custom_image else 0
         self.select_image_button.setEnabled(use_custom_image)
-    
-    def toggle_sound_source(self, checked):
+        self.image_switch.update()
+
+    def toggle_sound(self):
         global use_custom_sound
-        use_custom_sound = not checked
+        use_custom_sound = not use_custom_sound
+        self.sound_switch.toggle_position = 1 if use_custom_sound else 0
         self.select_sound_button.setEnabled(use_custom_sound)
         self.test_sound_button.setEnabled(use_custom_sound and selected_sound is not None)
-    
+        self.sound_switch.update()
+
     def select_custom_image(self):
         global selected_image
         file_dialog = QFileDialog()
