@@ -122,7 +122,7 @@ popup_manager = None
 def get_dark_stylesheet():
     return """
     QWidget { background-color: #121212; color: #e0e0e0; font-family: Segoe UI, Arial; font-size: 10pt; }
-    QPushButton { background-color: #1f1f1f; color: white; border: none; padding: 8px; border-radius: 4px; }
+    QPushButton { background-color: #1f1f1f; color: white; border: none, padding: 8px; border-radius: 4px; }
     QPushButton:hover { background-color: #3a3a3a; }
     QLineEdit, QDateTimeEdit, QTimeEdit, QListWidget { background-color: #1f1f1f; color: white; border: 1px solid #555; border-radius: 4px; }
     QLabel { font-weight: bold; }
@@ -148,41 +148,83 @@ class ReminderTab(QWidget):
         self.setWindowTitle("CeLOE Reminder App")
         self.setMinimumSize(500, 600)
         self.layout = QVBoxLayout()
-        title_label = QLabel("Judul Pengingat:")
+        self.layout.setContentsMargins(32, 24, 32, 24)
+        self.layout.setSpacing(18)
+
+        # Judul
+        title_label = QLabel("Tambah Pengingat")
+        title_label.setStyleSheet("font-size: 20px; font-weight: bold; margin-bottom: 8px;")
+        self.layout.addWidget(title_label)
+
+        # Input judul
         self.title_input = QLineEdit()
-        self.title_input.setPlaceholderText("Reminder Title")
-        datetime_label = QLabel("Tanggal & Waktu:")
+        self.title_input.setPlaceholderText("Judul pengingat")
+        self.title_input.setMinimumHeight(32)
+        self.title_input.setStyleSheet("font-size: 13px; padding: 6px 10px;")
+        self.layout.addWidget(self.title_input)
+
+        # Input tanggal & waktu
+        datetime_label = QLabel("Tanggal & Waktu")
+        datetime_label.setStyleSheet("font-size: 12px; margin-top: 8px;")
+        self.layout.addWidget(datetime_label)
+
         datetime_frame = QHBoxLayout()
+        datetime_frame.setSpacing(12)
         self.date_input = QDateTimeEdit()
         self.date_input.setDisplayFormat("dd/MM/yyyy")
         self.date_input.setCalendarPopup(True)
         self.date_input.setDate(QDateTime.currentDateTime().date())
+        self.date_input.setMinimumHeight(32)
         self.time_input = QTimeEdit()
         self.time_input.setDisplayFormat("HH:mm:ss")
         self.time_input.setTime(QDateTime.currentDateTime().time())
         self.time_input.setTimeRange(QTime(0, 0, 0), QTime(23, 59, 59))
         self.time_input.setButtonSymbols(QTimeEdit.PlusMinus)
-        self.time_input.setCalendarPopup(True)
+        self.time_input.setMinimumHeight(32)
         datetime_frame.addWidget(self.date_input)
         datetime_frame.addWidget(self.time_input)
-        self.add_button = QPushButton("Tambah Reminder")
-        self.add_button.clicked.connect(self.add_reminder)
-        self.edit_button = QPushButton("Edit Reminder")
-        self.edit_button.clicked.connect(self.edit_reminder)
-        self.delete_button = QPushButton("Hapus Reminder")
-        self.delete_button.clicked.connect(self.delete_reminder)
-        list_label = QLabel("Daftar Reminder:")
-        self.reminder_list = QListWidget()
-        self.reminder_list.itemClicked.connect(self.on_select)
-        self.layout.addWidget(title_label)
-        self.layout.addWidget(self.title_input)
-        self.layout.addWidget(datetime_label)
         self.layout.addLayout(datetime_frame)
-        self.layout.addWidget(self.add_button)
-        self.layout.addWidget(self.edit_button)
-        self.layout.addWidget(self.delete_button)
+
+        # Tombol aksi (horizontal)
+        button_row = QHBoxLayout()
+        button_row.setSpacing(10)
+        self.add_button = QPushButton("Tambah")
+        self.add_button.setMinimumHeight(32)
+        self.add_button.clicked.connect(self.add_reminder)
+        self.edit_button = QPushButton("Edit")
+        self.edit_button.setMinimumHeight(32)
+        self.edit_button.clicked.connect(self.edit_reminder)
+        self.delete_button = QPushButton("Hapus")
+        self.delete_button.setMinimumHeight(32)
+        self.delete_button.clicked.connect(self.delete_reminder)
+        button_row.addWidget(self.add_button)
+        button_row.addWidget(self.edit_button)
+        button_row.addWidget(self.delete_button)
+        self.layout.addLayout(button_row)
+
+        # Label daftar
+        list_label = QLabel("Daftar Reminder")
+        list_label.setStyleSheet("font-size: 13px; font-weight: bold; margin-top: 18px;")
         self.layout.addWidget(list_label)
+
+        # List reminder
+        self.reminder_list = QListWidget()
+        self.reminder_list.setStyleSheet("""
+            QListWidget {
+                border: 1px solid #bbb;
+                border-radius: 8px;
+                padding: 8px;
+                font-size: 13px;
+                min-height: 180px;
+            }
+            QListWidget::item:selected {
+                background: #0d6efd33;
+                color: #0d6efd;
+            }
+        """)
+        self.reminder_list.itemClicked.connect(self.on_select)
         self.layout.addWidget(self.reminder_list)
+
         self.setLayout(self.layout)
         pygame.mixer.init()
 
@@ -256,12 +298,28 @@ class CustomizeTab(QWidget):
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout()
-        image_group = QGroupBox("Setting Notifikasi")
+        layout.setContentsMargins(32, 24, 32, 24)
+        layout.setSpacing(18)
+
+        # Judul
+        title_label = QLabel("Reminder Customize Settings")
+        title_label.setStyleSheet("font-size: 20px; font-weight: bold; margin-bottom: 8px;")
+        layout.addWidget(title_label)
+
+        # Gambar
+        image_label = QLabel("Pengaturan Gambar Notifikasi")
+        image_label.setStyleSheet("font-size: 13px; font-weight: bold; margin-top: 8px;")
+        layout.addWidget(image_label)
+
+        image_group = QGroupBox()
+        image_group.setStyleSheet("""
+            QGroupBox { border: 1px solid #bbb; border-radius: 8px; margin-top: 8px; padding: 12px; }
+        """)
         image_layout = QVBoxLayout()
         self.default_image_radio = QRadioButton("Gunakan gambar Random")
         self.default_image_radio.setChecked(not use_custom_image)
         self.default_image_radio.toggled.connect(self.toggle_image_source)
-        self.custom_image_radio = QRadioButton("Gunakan gamber Custom")
+        self.custom_image_radio = QRadioButton("Gunakan gambar Custom")
         self.custom_image_radio.setChecked(use_custom_image)
         self.select_image_button = QPushButton("Pilih gambar")
         self.select_image_button.clicked.connect(self.select_custom_image)
@@ -272,7 +330,7 @@ class CustomizeTab(QWidget):
         self.image_preview = QLabel()
         self.image_preview.setFixedSize(200, 200)
         self.image_preview.setAlignment(Qt.AlignCenter)
-        self.image_preview.setStyleSheet("border: 1px solid #ccc;")
+        self.image_preview.setStyleSheet("border: 1px solid #ccc; border-radius: 6px;")
         if selected_image and os.path.exists(selected_image):
             pixmap = QPixmap(selected_image)
             self.image_preview.setPixmap(pixmap.scaled(180, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation))
@@ -282,7 +340,17 @@ class CustomizeTab(QWidget):
         image_layout.addWidget(self.selected_image_label)
         image_layout.addWidget(self.image_preview)
         image_group.setLayout(image_layout)
-        sound_group = QGroupBox("Setting suara")
+        layout.addWidget(image_group)
+
+        # Suara
+        sound_label = QLabel("Pengaturan Suara Notifikasi")
+        sound_label.setStyleSheet("font-size: 13px; font-weight: bold; margin-top: 8px;")
+        layout.addWidget(sound_label)
+
+        sound_group = QGroupBox()
+        sound_group.setStyleSheet("""
+            QGroupBox { border: 1px solid #bbb; border-radius: 8px; margin-top: 8px; padding: 12px; }
+        """)
         sound_layout = QVBoxLayout()
         self.default_sound_radio = QRadioButton("Gunakan suara Random")
         self.default_sound_radio.setChecked(not use_custom_sound)
@@ -304,14 +372,19 @@ class CustomizeTab(QWidget):
         sound_layout.addWidget(self.selected_sound_label)
         sound_layout.addWidget(self.test_sound_button)
         sound_group.setLayout(sound_layout)
+        layout.addWidget(sound_group)
+
+        # Tombol aksi
+        button_row = QHBoxLayout()
+        button_row.setSpacing(10)
         preview_button = QPushButton("Test Notifikasi")
         preview_button.clicked.connect(self.preview_reminder)
         save_button = QPushButton("Simpan setting")
         save_button.clicked.connect(self.save_settings)
-        layout.addWidget(image_group)
-        layout.addWidget(sound_group)
-        layout.addWidget(preview_button)
-        layout.addWidget(save_button)
+        button_row.addWidget(preview_button)
+        button_row.addWidget(save_button)
+        layout.addLayout(button_row)
+
         layout.addStretch()
         self.setLayout(layout)
     
@@ -440,37 +513,42 @@ class MainWindow(QMainWindow):
         toolbar = QToolBar("MainToolbar")
         toolbar.setMovable(False)
         toolbar.setFloatable(False)
-        toolbar.setStyleSheet("QToolBar { background: white; border: none; }")
+        # Hilangkan border & background, dan garis bawah
+        toolbar.setStyleSheet("""
+            QToolBar { background: #121212; border: none; padding: 0; }
+        """)
         self.addToolBar(Qt.TopToolBarArea, toolbar)
 
         # Tambahkan logo atau tombol "peel" di kiri atas
-        # Contoh pakai logo (jika ada file logo di ICON_PATH)
         if os.path.exists(str(ICON_PATH)):
             logo_label = QLabel()
             logo_pixmap = QPixmap(str(ICON_PATH)).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             logo_label.setPixmap(logo_pixmap)
-            logo_label.setContentsMargins(8, 0, 16, 0)
+            logo_label.setContentsMargins(8, 0, 8, 0)
             toolbar.addWidget(logo_label)
         else:
-            # Jika ingin tombol "Peel" (bisa diganti dengan teks/logo lain)
             peel_btn = QPushButton("Peel")
-            peel_btn.setStyleSheet("background: transparent; font-weight: bold; font-size: 14pt; color: #b00;")
+            peel_btn.setStyleSheet("background: transparent; font-weight: bold; font-size: 14pt; color: #b00; border: none;")
             peel_btn.setCursor(Qt.PointingHandCursor)
             peel_btn.setAttribute(Qt.WA_TranslucentBackground)
-            # peel_btn.clicked.connect(self.peel_action)  # Tambahkan aksi jika perlu
             toolbar.addWidget(peel_btn)
 
-        reminder_btn = QPushButton("Reminder")
-        reminder_btn.setStyleSheet("background: transparent; font-weight: bold; font-size: 12pt; color: #b00;")
-        reminder_btn.clicked.connect(lambda: self.show_page(self.reminder_tab))
-        toolbar.addWidget(reminder_btn)
+        # Simpan referensi tombol agar bisa diubah stylenya
+        self.celoe_btn = QPushButton("CeLOE")
+        self.celoe_btn.setCursor(Qt.PointingHandCursor)
+        self.celoe_btn.setFlat(True)
+        self.celoe_btn.setStyleSheet("background: transparent; border: none; padding: 0 16px; font-weight: bold; font-size: 14px;")
+        self.celoe_btn.clicked.connect(lambda: self.show_page(self.celoe_tab))
+        toolbar.addWidget(self.celoe_btn)
 
-        celoe_btn = QPushButton("CeLOE")
-        celoe_btn.setStyleSheet("background: transparent; font-weight: bold; font-size: 12pt; color: #b00;")
-        celoe_btn.clicked.connect(lambda: self.show_page(self.celoe_tab))
-        celoe_btn.setAttribute(Qt.WA_TranslucentBackground)
-        toolbar.addWidget(celoe_btn)
+        self.reminder_btn = QPushButton("Reminder")
+        self.reminder_btn.setCursor(Qt.PointingHandCursor)
+        self.reminder_btn.setFlat(True)
+        self.reminder_btn.setStyleSheet("background: transparent; border: none; padding: 0 16px; font-weight: bold; font-size: 14px;")
+        self.reminder_btn.clicked.connect(lambda: self.show_page(self.reminder_tab))
+        toolbar.addWidget(self.reminder_btn)
 
+      
         # Spacer agar menu kanan ke kanan
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -480,7 +558,7 @@ class MainWindow(QMainWindow):
         menu_right = QMenu("☰", self)
         ui_settings_action = menu_right.addAction("UI Settings")
         ui_settings_action.triggered.connect(lambda: self.show_page(self.ui_settings_tab))
-        customize_action = menu_right.addAction("Customize")
+        customize_action = menu_right.addAction("Reminder Customize Settings")
         customize_action.triggered.connect(lambda: self.show_page(self.customize_tab))
         menu_right.addSeparator()
         toggle_theme_action = menu_right.addAction("Switch Mode")
@@ -488,7 +566,7 @@ class MainWindow(QMainWindow):
 
         self.menu_button = QPushButton("☰")
         self.menu_button.setMaximumWidth(40)
-        self.menu_button.setStyleSheet("font-size: 18px;")
+        self.menu_button.setStyleSheet("bacgorund:#0000; font-size: 18px;")
         self.menu_button.setMenu(menu_right)
         toolbar.addWidget(self.menu_button)
 
@@ -511,6 +589,52 @@ class MainWindow(QMainWindow):
     def apply_theme(self):
         stylesheet = get_dark_stylesheet() if self.dark_mode else get_light_stylesheet()
         self.setStyleSheet(stylesheet)
+        # Ubah warna tombol sesuai mode
+        if self.dark_mode:
+            btn_style = "background: transparent; border: none; padding: 0 16px; font-weight: bold; font-size: 14px; color: #e0e0e0;"
+            toolbar_style = "QToolBar { background: #121212; border: none; padding: 0; }"
+            menu_btn_style = "background: transparent; border: none; font-size: 18px; color: #e0e0e0;"
+            action_btn_style = (
+                "background-color: #a30000; color: white; border: none; border-radius: 4px; "
+                "padding: 8px 18px; font-weight: bold; font-size: 13px;"
+            )
+        else:
+            btn_style = "background: transparent; border: none; padding: 0 16px; font-weight: bold; font-size: 14px; color: #b00;"
+            toolbar_style = "QToolBar { background: white; border: none; padding: 0; }"
+            menu_btn_style = "background: transparent; border: none; font-size: 18px; color: #b00;"
+            action_btn_style = (
+                "background-color: #b00; color: white; border: none; border-radius: 4px; "
+                "padding: 8px 18px; font-weight: bold; font-size: 13px;"
+            )
+        self.reminder_btn.setStyleSheet(btn_style)
+        self.celoe_btn.setStyleSheet(btn_style)
+        self.menu_button.setStyleSheet(menu_btn_style)
+        self.findChild(QToolBar).setStyleSheet(toolbar_style)
+        # Atur warna tombol aksi di ReminderTab
+        self.reminder_tab.add_button.setStyleSheet(action_btn_style)
+        self.reminder_tab.edit_button.setStyleSheet(action_btn_style)
+        self.reminder_tab.delete_button.setStyleSheet(action_btn_style)
+        # Atur warna tombol aksi di CustomizeTab
+        for btn in [
+            self.customize_tab.select_image_button,
+            self.customize_tab.select_sound_button,
+            self.customize_tab.test_sound_button,
+            # Tombol aksi bawah:
+            self.customize_tab.findChild(QPushButton, "Test Notifikasi"),
+            self.customize_tab.findChild(QPushButton, "Simpan setting"),
+        ]:
+            if btn:
+                btn.setStyleSheet(action_btn_style)
+        # Alternatif: jika tombol bawah tidak ditemukan dengan findChild, set manual:
+        layout = self.customize_tab.layout()
+        if layout:
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                if isinstance(item, QHBoxLayout):
+                    for j in range(item.count()):
+                        btn = item.itemAt(j).widget()
+                        if isinstance(btn, QPushButton):
+                            btn.setStyleSheet(action_btn_style)
 
 def play_alarm(alarm_type="regular"):
     try:
