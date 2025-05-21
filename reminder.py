@@ -443,14 +443,32 @@ class MainWindow(QMainWindow):
         toolbar.setStyleSheet("QToolBar { background: white; border: none; }")
         self.addToolBar(Qt.TopToolBarArea, toolbar)
 
+        # Tambahkan logo atau tombol "peel" di kiri atas
+        # Contoh pakai logo (jika ada file logo di ICON_PATH)
+        if os.path.exists(str(ICON_PATH)):
+            logo_label = QLabel()
+            logo_pixmap = QPixmap(str(ICON_PATH)).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo_label.setPixmap(logo_pixmap)
+            logo_label.setContentsMargins(8, 0, 16, 0)
+            toolbar.addWidget(logo_label)
+        else:
+            # Jika ingin tombol "Peel" (bisa diganti dengan teks/logo lain)
+            peel_btn = QPushButton("Peel")
+            peel_btn.setStyleSheet("background: transparent; font-weight: bold; font-size: 14pt; color: #b00;")
+            peel_btn.setCursor(Qt.PointingHandCursor)
+            peel_btn.setAttribute(Qt.WA_TranslucentBackground)
+            # peel_btn.clicked.connect(self.peel_action)  # Tambahkan aksi jika perlu
+            toolbar.addWidget(peel_btn)
+
         reminder_btn = QPushButton("Reminder")
-        reminder_btn.setStyleSheet("background: transparent; font-weight: bold; font-size: 12pt;")
+        reminder_btn.setStyleSheet("background: transparent; font-weight: bold; font-size: 12pt; color: #b00;")
         reminder_btn.clicked.connect(lambda: self.show_page(self.reminder_tab))
         toolbar.addWidget(reminder_btn)
 
         celoe_btn = QPushButton("CeLOE")
-        celoe_btn.setStyleSheet("background: transparent; font-weight: bold; font-size: 12pt;")
+        celoe_btn.setStyleSheet("background: transparent; font-weight: bold; font-size: 12pt; color: #b00;")
         celoe_btn.clicked.connect(lambda: self.show_page(self.celoe_tab))
+        celoe_btn.setAttribute(Qt.WA_TranslucentBackground)
         toolbar.addWidget(celoe_btn)
 
         # Spacer agar menu kanan ke kanan
@@ -465,7 +483,7 @@ class MainWindow(QMainWindow):
         customize_action = menu_right.addAction("Customize")
         customize_action.triggered.connect(lambda: self.show_page(self.customize_tab))
         menu_right.addSeparator()
-        toggle_theme_action = menu_right.addAction("Swicth Mode")
+        toggle_theme_action = menu_right.addAction("Switch Mode")
         toggle_theme_action.triggered.connect(self.toggle_theme)
 
         self.menu_button = QPushButton("☰")
