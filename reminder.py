@@ -11,7 +11,7 @@ from plyer import notification
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout,
     QVBoxLayout, QPushButton, QListWidget, QDateTimeEdit, QMessageBox,
-    QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit, QTabWidget, QFileDialog, QGroupBox, QRadioButton
+    QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit, QTabWidget, QFileDialog, QGroupBox, QRadioButton, QSizePolicy, QToolBar
 )
 from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize, QTime, QObject, pyqtSignal
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -405,29 +405,86 @@ class CustomizeTab(QWidget):
         use_custom_sound = self.custom_sound_radio.isChecked()
         QMessageBox.information(self, "Success", "Settings saved successfully!")
 
+class UISettingsTab(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout()
+        
+        # Add your UI settings controls here
+        # For example, toggle switches for different UI themes or layouts
+        
+        self.setLayout(layout)
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CELOE Reminder App")
-        self.setMinimumSize(800, 600)
-        self.tabs = QTabWidget()
-        self.setCentralWidget(self.tabs)
+        self.setMinimumSize(900, 600)
+
+        # Central widget untuk ganti konten
+        self.central_widget = QWidget()
+        self.central_layout = QVBoxLayout()
+        self.central_widget.setLayout(self.central_layout)
+        self.setCentralWidget(self.central_widget)
+
+        # Inisialisasi halaman
         self.reminder_tab = ReminderTab()
         self.celoe_tab = BrowserTab()
         self.customize_tab = CustomizeTab()
-        self.tabs.addTab(self.reminder_tab, "Reminder")
-        self.tabs.addTab(self.celoe_tab, "CeLOE")
-        self.tabs.addTab(self.customize_tab, "Customize")
+        self.ui_settings_tab = UISettingsTab()
+
+        # Tampilkan halaman default
+        self.show_page(self.celoe_tab)
+
+        # --- NAVBAR KIRI: pakai QToolBar agar horizontal, bukan dropdown ---
+        toolbar = QToolBar("MainToolbar")
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+        toolbar.setStyleSheet("QToolBar { background: white; border: none; }")
+        self.addToolBar(Qt.TopToolBarArea, toolbar)
+
+        reminder_btn = QPushButton("Reminder")
+        reminder_btn.setStyleSheet("background: transparent; font-weight: bold; font-size: 12pt;")
+        reminder_btn.clicked.connect(lambda: self.show_page(self.reminder_tab))
+        toolbar.addWidget(reminder_btn)
+
+        celoe_btn = QPushButton("CeLOE")
+        celoe_btn.setStyleSheet("background: transparent; font-weight: bold; font-size: 12pt;")
+        celoe_btn.clicked.connect(lambda: self.show_page(self.celoe_tab))
+        toolbar.addWidget(celoe_btn)
+
+        # Spacer agar menu kanan ke kanan
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        toolbar.addWidget(spacer)
+
+        # --- NAVBAR KANAN: tombol dropdown ---
+        menu_right = QMenu("☰", self)
+        ui_settings_action = menu_right.addAction("UI Settings")
+        ui_settings_action.triggered.connect(lambda: self.show_page(self.ui_settings_tab))
+        customize_action = menu_right.addAction("Customize")
+        customize_action.triggered.connect(lambda: self.show_page(self.customize_tab))
+        menu_right.addSeparator()
+        toggle_theme_action = menu_right.addAction("Swicth Mode")
+        toggle_theme_action.triggered.connect(self.toggle_theme)
+
+        self.menu_button = QPushButton("☰")
+        self.menu_button.setMaximumWidth(40)
+        self.menu_button.setStyleSheet("font-size: 18px;")
+        self.menu_button.setMenu(menu_right)
+        toolbar.addWidget(self.menu_button)
 
         self.dark_mode = False
-
-        menubar = self.menuBar()
-        self.toggle_theme_button = QPushButton("Toggle Mode")
-        self.toggle_theme_button.clicked.connect(self.toggle_theme)
-        self.toggle_theme_button.setMaximumWidth(200)
-        menubar.setCornerWidget(self.toggle_theme_button, Qt.TopRightCorner)
-
         self.apply_theme()
+
+    def show_page(self, widget):
+        # Ganti konten central widget
+        for i in reversed(range(self.central_layout.count())):
+            item = self.central_layout.itemAt(i)
+            widget_to_remove = item.widget()
+            if widget_to_remove:
+                widget_to_remove.setParent(None)
+        self.central_layout.addWidget(widget)
 
     def toggle_theme(self):
         self.dark_mode = not self.dark_mode
