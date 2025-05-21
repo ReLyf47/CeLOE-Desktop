@@ -750,7 +750,7 @@ def auto_delete_old_reminders(window):
         for i in reversed(to_delete):
             del reminders[i]
             window.reminder_tab.reminder_list.takeItem(i)
-        time.sleep(5)
+        time.sleep(5) #h
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
