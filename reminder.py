@@ -9,13 +9,13 @@ import schedule
 from datetime import datetime, timedelta
 from plyer import notification
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout,
+    QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout,QToolBar,
     QVBoxLayout, QPushButton, QListWidget, QDateTimeEdit, QMessageBox,
-    QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit, QTabWidget, QFileDialog, QGroupBox, QRadioButton, QSizePolicy, QToolBar
+    QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit, QFileDialog, QGroupBox, QRadioButton, QSizePolicy, QToolBar
 )
-from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize, QTime, QObject, pyqtSignal
+from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize, QTime, QObject, pyqtSignal, QPropertyAnimation
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtGui import QIcon, QPixmap, QMovie
+from PyQt5.QtGui import QIcon, QPixmap, QMovie, QPainter, QColor, QPen
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -119,11 +119,187 @@ class PopupManager(QObject):
 
 popup_manager = None 
 
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("CELOE Reminder App")
+        self.setMinimumSize(720, 720)
+
+        # Central widget untuk ganti konten
+        self.central_widget = QWidget()
+        self.central_layout = QVBoxLayout()
+        self.central_widget.setLayout(self.central_layout)
+        self.setCentralWidget(self.central_widget)
+
+        # Inisialisasi halaman
+        self.reminder_tab = ReminderTab()
+        self.celoe_tab = BrowserTab()
+        self.customize_tab = CustomizeTab()
+
+        # --- NAVBAR KIRI: pakai QToolBar vertikal ---
+        toolbar = QToolBar("MainToolbar")
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+        toolbar.setOrientation(Qt.Vertical)
+        toolbar.setStyleSheet("""
+            QToolBar { background: #121212; border: none; padding: 0; }
+        """)
+        self.addToolBar(Qt.LeftToolBarArea, toolbar)
+
+        # Tambahkan logo di atas
+        if os.path.exists(str(ICON_PATH)):
+            logo_label = QLabel()
+            logo_pixmap = QPixmap(str(ICON_PATH)).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo_label.setPixmap(logo_pixmap)
+            logo_label.setContentsMargins(8, 8, 8, 8)
+            toolbar.addWidget(logo_label)
+        else:
+            peel_btn = QPushButton("Peel")
+            peel_btn.setStyleSheet("background: transparent; font-weight: bold; font-size: 14pt; color: #b00; border: none;")
+            peel_btn.setCursor(Qt.PointingHandCursor)
+            peel_btn.setAttribute(Qt.WA_TranslucentBackground)
+            toolbar.addWidget(peel_btn)
+
+        # Tombol tab utama (vertikal, rata kiri, warna merah)
+        self.tab_buttons = []
+        self.tab_pages = [self.celoe_tab, self.reminder_tab, self.customize_tab]
+        tab_names = ["CeLOE", "Reminder", "Customize"]
+
+        for i, (tab_name, tab_page) in enumerate(zip(tab_names, self.tab_pages)):
+            btn = QPushButton(tab_name)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setFlat(True)
+            btn.setMinimumWidth(120)
+            btn.setMaximumWidth(160)
+            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            btn.clicked.connect(lambda checked, idx=i: self.show_page(self.tab_pages[idx], idx))
+            toolbar.addWidget(btn)
+            self.tab_buttons.append(btn)
+
+        # Add spacer widget to push remaining items to bottom
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
+        toolbar.addWidget(spacer)
+
+        # Add container widget for centered toggle switch
+        toggle_container = QWidget()
+        toggle_layout = QHBoxLayout(toggle_container)
+        toggle_layout.setContentsMargins(8, 0, 8, 16)  # Add bottom margin
+        toggle_layout.setAlignment(Qt.AlignCenter)
+        
+        self.theme_toggle = QWidget()
+        self.theme_toggle.setFixedSize(50, 24)
+        self.theme_toggle_animation = QPropertyAnimation(self.theme_toggle, b"toggle_position")
+        self.theme_toggle_animation.setDuration(200)
+        self.theme_toggle.toggle_position = 0
+        self.theme_toggle.setStyleSheet("""
+            QWidget {
+                background: #b00;
+                border-radius: 12px;
+                border: none;
+            }
+        """)
+        self.theme_toggle.mousePressEvent = lambda e: self.toggle_theme()
+        self.theme_toggle.paintEvent = self.paint_toggle
+        
+        toggle_layout.addWidget(self.theme_toggle)
+        toolbar.addWidget(toggle_container)
+
+        self.dark_mode = False
+        self.active_tab_index = 0
+        self.apply_theme()
+        self.show_page(self.celoe_tab, 0)
+
+    def paint_toggle(self, e):
+        painter = QPainter(self.theme_toggle)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        # Draw background
+        painter.setPen(Qt.NoPen)
+        if self.dark_mode:
+            # Dark mode - red background
+            painter.setBrush(QColor("#b00"))
+        else:
+            # Light mode - white background with red border
+            painter.setBrush(QColor("white"))
+            pen = QPen(QColor("#b00"), 2)
+            painter.setPen(pen)
+        
+        painter.drawRoundedRect(0, 0, 50, 24, 12, 12)
+        
+        # Draw toggle circle
+        if self.dark_mode:
+            # Dark mode - white circle
+            painter.setBrush(QColor("white"))
+        else:
+            # Light mode - red circle
+            painter.setBrush(QColor("#b00"))
+        
+        painter.setPen(Qt.NoPen)
+        x = 4 + (self.theme_toggle.toggle_position * 26)
+        painter.drawEllipse(x, 4, 16, 16)
+
+    def toggle_theme(self):
+        self.dark_mode = not self.dark_mode
+        self.theme_toggle_animation.setStartValue(self.theme_toggle.toggle_position)
+        self.theme_toggle_animation.setEndValue(1 if self.dark_mode else 0)
+        self.theme_toggle_animation.start()
+        self.theme_toggle.toggle_position = 1 if self.dark_mode else 0
+        self.apply_theme()
+
+    def _move_theme_toggle(self, event):
+        self.theme_toggle.move(self.width() - 120, 10)
+
+    def show_page(self, widget, tab_index=None):
+        # Ganti konten central widget
+        for i in reversed(range(self.central_layout.count())):
+            item = self.central_layout.itemAt(i)
+            widget_to_remove = item.widget()
+            if widget_to_remove:
+                widget_to_remove.setParent(None)
+        self.central_layout.addWidget(widget)
+        # Highlight tab aktif
+        if tab_index is not None:
+            self.active_tab_index = tab_index
+        self.update_tab_highlight()
+
+    def update_tab_highlight(self):
+        for i, btn in enumerate(self.tab_buttons):
+            if i == self.active_tab_index:
+                btn.setStyleSheet("""
+                    background: #ffeaea; border: none; padding: 12px 8px; font-weight: bold; font-size: 14px; color: #b00; text-align: left; border-radius: 8px;
+                """)
+            else:
+                btn.setStyleSheet("""
+                    background: transparent; border: none; padding: 12px 8px; font-weight: bold; font-size: 14px; color: #b00; text-align: left;
+                """)
+
+    def apply_theme(self):
+        stylesheet = get_dark_stylesheet() if self.dark_mode else get_light_stylesheet()
+        self.setStyleSheet(stylesheet)
+        # Ubah warna tombol sesuai mode
+        if self.dark_mode:
+            highlight_bg = "#2d1a1a"
+            btn_style = "background: transparent; border: none; padding: 12px 8px; font-weight: bold; font-size: 14px; color: #e57373; text-align: left;"
+            highlight_style = f"background: {highlight_bg}; border: none; padding: 12px 8px; font-weight: bold; font-size: 14px; color: #e57373; text-align: left; border-radius: 8px;"
+            toolbar_style = "QToolBar { background: #121212; border: none; padding: 0; }"
+        else:
+            highlight_bg = "#ffeaea"
+            btn_style = "background: transparent; border: none; padding: 12px 8px; font-weight: bold; font-size: 14px; color: #b00; text-align: left;"
+            highlight_style = f"background: {highlight_bg}; border: none; padding: 12px 8px; font-weight: bold; font-size: 14px; color: #b00; text-align: left; border-radius: 8px;"
+            toolbar_style = "QToolBar { background: white; border: none; padding: 0; }"
+        for i, btn in enumerate(self.tab_buttons):
+            if i == self.active_tab_index:
+                btn.setStyleSheet(highlight_style)
+            else:
+                btn.setStyleSheet(btn_style)
+        self.findChild(QToolBar).setStyleSheet(toolbar_style)
+
 def get_dark_stylesheet():
     return """
     QWidget { background-color: #121212; color: #e0e0e0; font-family: Segoe UI, Arial; font-size: 10pt; }
-    QPushButton { background-color: #1f1f1f; color: white; border: none, padding: 8px; border-radius: 4px; }
-    QPushButton:hover { background-color: #3a3a3a; }
+    QPushButton { background-color: #b00; color: white; border: none; padding: 8px; border-radius: 4px; }
+    QPushButton:hover { background-color: #d32f2f; }
     QLineEdit, QDateTimeEdit, QTimeEdit, QListWidget { background-color: #1f1f1f; color: white; border: 1px solid #555; border-radius: 4px; }
     QLabel { font-weight: bold; }
     QRadioButton { color: #e0e0e0; }
@@ -134,8 +310,8 @@ def get_dark_stylesheet():
 def get_light_stylesheet():
     return """
     QWidget { font-family: Segoe UI, Arial; font-size: 10pt; }
-    QPushButton { background-color: #0d6efd; color: white; border: none; padding: 8px; border-radius: 4px; }
-    QPushButton:hover { background-color: #0b5ed7; }
+    QPushButton { background-color: #b00; color: white; border: none; padding: 8px; border-radius: 4px; }
+    QPushButton:hover { background-color: #d32f2f; }
     QLineEdit, QDateTimeEdit, QTimeEdit { padding: 6px; border: 1px solid #ced4da; border-radius: 4px; }
     QLabel { font-weight: bold; }
     QGroupBox { border: 1px solid #ced4da; border-radius: 4px; margin-top: 1ex; padding-top: 10px; }
@@ -477,164 +653,6 @@ class CustomizeTab(QWidget):
         use_custom_image = self.custom_image_radio.isChecked()
         use_custom_sound = self.custom_sound_radio.isChecked()
         QMessageBox.information(self, "Success", "Settings saved successfully!")
-
-class UISettingsTab(QWidget):
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout()
-        
-        # Add your UI settings controls here
-        # For example, toggle switches for different UI themes or layouts
-        
-        self.setLayout(layout)
-
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("CELOE Reminder App")
-        self.setMinimumSize(720, 720)
-
-        # Central widget untuk ganti konten
-        self.central_widget = QWidget()
-        self.central_layout = QVBoxLayout()
-        self.central_widget.setLayout(self.central_layout)
-        self.setCentralWidget(self.central_widget)
-
-        # Inisialisasi halaman
-        self.reminder_tab = ReminderTab()
-        self.celoe_tab = BrowserTab()
-        self.customize_tab = CustomizeTab()
-        self.ui_settings_tab = UISettingsTab()
-
-        # Tampilkan halaman default
-        self.show_page(self.celoe_tab)
-
-        # --- NAVBAR KIRI: pakai QToolBar agar horizontal, bukan dropdown ---
-        toolbar = QToolBar("MainToolbar")
-        toolbar.setMovable(False)
-        toolbar.setFloatable(False)
-        # Hilangkan border & background, dan garis bawah
-        toolbar.setStyleSheet("""
-            QToolBar { background: #121212; border: none; padding: 0; }
-        """)
-        self.addToolBar(Qt.TopToolBarArea, toolbar)
-
-        # Tambahkan logo atau tombol "peel" di kiri atas
-        if os.path.exists(str(ICON_PATH)):
-            logo_label = QLabel()
-            logo_pixmap = QPixmap(str(ICON_PATH)).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            logo_label.setPixmap(logo_pixmap)
-            logo_label.setContentsMargins(8, 0, 8, 0)
-            toolbar.addWidget(logo_label)
-        else:
-            peel_btn = QPushButton("Peel")
-            peel_btn.setStyleSheet("background: transparent; font-weight: bold; font-size: 14pt; color: #b00; border: none;")
-            peel_btn.setCursor(Qt.PointingHandCursor)
-            peel_btn.setAttribute(Qt.WA_TranslucentBackground)
-            toolbar.addWidget(peel_btn)
-
-        # Simpan referensi tombol agar bisa diubah stylenya
-        self.celoe_btn = QPushButton("CeLOE")
-        self.celoe_btn.setCursor(Qt.PointingHandCursor)
-        self.celoe_btn.setFlat(True)
-        self.celoe_btn.setStyleSheet("background: transparent; border: none; padding: 0 16px; font-weight: bold; font-size: 14px;")
-        self.celoe_btn.clicked.connect(lambda: self.show_page(self.celoe_tab))
-        toolbar.addWidget(self.celoe_btn)
-
-        self.reminder_btn = QPushButton("Reminder")
-        self.reminder_btn.setCursor(Qt.PointingHandCursor)
-        self.reminder_btn.setFlat(True)
-        self.reminder_btn.setStyleSheet("background: transparent; border: none; padding: 0 16px; font-weight: bold; font-size: 14px;")
-        self.reminder_btn.clicked.connect(lambda: self.show_page(self.reminder_tab))
-        toolbar.addWidget(self.reminder_btn)
-
-      
-        # Spacer agar menu kanan ke kanan
-        spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        toolbar.addWidget(spacer)
-
-        # --- NAVBAR KANAN: tombol dropdown ---
-        menu_right = QMenu("☰", self)
-        ui_settings_action = menu_right.addAction("UI Settings")
-        ui_settings_action.triggered.connect(lambda: self.show_page(self.ui_settings_tab))
-        customize_action = menu_right.addAction("Reminder Customize Settings")
-        customize_action.triggered.connect(lambda: self.show_page(self.customize_tab))
-        menu_right.addSeparator()
-        toggle_theme_action = menu_right.addAction("Switch Mode")
-        toggle_theme_action.triggered.connect(self.toggle_theme)
-
-        self.menu_button = QPushButton("☰")
-        self.menu_button.setMaximumWidth(40)
-        self.menu_button.setStyleSheet("bacgorund:#0000; font-size: 18px;")
-        self.menu_button.setMenu(menu_right)
-        toolbar.addWidget(self.menu_button)
-
-        self.dark_mode = False
-        self.apply_theme()
-
-    def show_page(self, widget):
-        # Ganti konten central widget
-        for i in reversed(range(self.central_layout.count())):
-            item = self.central_layout.itemAt(i)
-            widget_to_remove = item.widget()
-            if widget_to_remove:
-                widget_to_remove.setParent(None)
-        self.central_layout.addWidget(widget)
-
-    def toggle_theme(self):
-        self.dark_mode = not self.dark_mode
-        self.apply_theme()
-
-    def apply_theme(self):
-        stylesheet = get_dark_stylesheet() if self.dark_mode else get_light_stylesheet()
-        self.setStyleSheet(stylesheet)
-        # Ubah warna tombol sesuai mode
-        if self.dark_mode:
-            btn_style = "background: transparent; border: none; padding: 0 16px; font-weight: bold; font-size: 14px; color: #e0e0e0;"
-            toolbar_style = "QToolBar { background: #121212; border: none; padding: 0; }"
-            menu_btn_style = "background: transparent; border: none; font-size: 18px; color: #e0e0e0;"
-            action_btn_style = (
-                "background-color: #a30000; color: white; border: none; border-radius: 4px; "
-                "padding: 8px 18px; font-weight: bold; font-size: 13px;"
-            )
-        else:
-            btn_style = "background: transparent; border: none; padding: 0 16px; font-weight: bold; font-size: 14px; color: #b00;"
-            toolbar_style = "QToolBar { background: white; border: none; padding: 0; }"
-            menu_btn_style = "background: transparent; border: none; font-size: 18px; color: #b00;"
-            action_btn_style = (
-                "background-color: #b00; color: white; border: none; border-radius: 4px; "
-                "padding: 8px 18px; font-weight: bold; font-size: 13px;"
-            )
-        self.reminder_btn.setStyleSheet(btn_style)
-        self.celoe_btn.setStyleSheet(btn_style)
-        self.menu_button.setStyleSheet(menu_btn_style)
-        self.findChild(QToolBar).setStyleSheet(toolbar_style)
-        # Atur warna tombol aksi di ReminderTab
-        self.reminder_tab.add_button.setStyleSheet(action_btn_style)
-        self.reminder_tab.edit_button.setStyleSheet(action_btn_style)
-        self.reminder_tab.delete_button.setStyleSheet(action_btn_style)
-        # Atur warna tombol aksi di CustomizeTab
-        for btn in [
-            self.customize_tab.select_image_button,
-            self.customize_tab.select_sound_button,
-            self.customize_tab.test_sound_button,
-            # Tombol aksi bawah:
-            self.customize_tab.findChild(QPushButton, "Test Notifikasi"),
-            self.customize_tab.findChild(QPushButton, "Simpan setting"),
-        ]:
-            if btn:
-                btn.setStyleSheet(action_btn_style)
-        # Alternatif: jika tombol bawah tidak ditemukan dengan findChild, set manual:
-        layout = self.customize_tab.layout()
-        if layout:
-            for i in range(layout.count()):
-                item = layout.itemAt(i)
-                if isinstance(item, QHBoxLayout):
-                    for j in range(item.count()):
-                        btn = item.itemAt(j).widget()
-                        if isinstance(btn, QPushButton):
-                            btn.setStyleSheet(action_btn_style)
 
 def play_alarm(alarm_type="regular"):
     try:
