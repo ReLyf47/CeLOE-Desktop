@@ -36,6 +36,7 @@ for directory in directories:
     directory.mkdir(exist_ok=True)
 
 reminders = []
+history = []  # Tambahkan di bagian global
 use_custom_image = False
 use_custom_sound = False
 selected_image = None
@@ -136,6 +137,7 @@ class MainWindow(QMainWindow):
         self.reminder_tab = ReminderTab()
         self.celoe_tab = BrowserTab()
         self.customize_tab = CustomizeTab()
+        self.history_tab = HistoryTab()  # Add history tab
 
         # --- NAVBAR KIRI: pakai QToolBar vertikal ---
         toolbar = QToolBar("MainToolbar")
@@ -163,8 +165,8 @@ class MainWindow(QMainWindow):
 
         # Tombol tab utama (vertikal, rata kiri, warna merah)
         self.tab_buttons = []
-        self.tab_pages = [self.celoe_tab, self.reminder_tab, self.customize_tab]
-        tab_names = ["CeLOE", "Reminder", "Customize"]
+        self.tab_pages = [self.celoe_tab, self.reminder_tab, self.history_tab, self.customize_tab]
+        tab_names = ["CeLOE", "Reminder", "History", "Customize"]  # Add "History" tab
 
         for i, (tab_name, tab_page) in enumerate(zip(tab_names, self.tab_pages)):
             btn = QPushButton(tab_name)
@@ -261,6 +263,8 @@ class MainWindow(QMainWindow):
             if widget_to_remove:
                 widget_to_remove.setParent(None)
         self.central_layout.addWidget(widget)
+        if isinstance(widget, HistoryTab):
+            widget.refresh_history()
         # Highlight tab aktif
         if tab_index is not None:
             self.active_tab_index = tab_index
@@ -622,7 +626,10 @@ class ReminderTab(QWidget):
         if selected == -1:
             QMessageBox.warning(self, "Warning", "Pilih reminder yang ingin dihapus.")
             return
-        title = reminders[selected]['title']
+        # --- Tambahkan ke history sebelum dihapus ---
+        reminder = reminders[selected]
+        history.append(reminder)
+        title = reminder['title']
         cancel_scheduled(title)
         del reminders[selected]
         self.reminder_list.takeItem(selected)
@@ -723,7 +730,7 @@ class CustomizeTab(QWidget):
         # Add selected image label
         self.selected_image_label = QLabel("Belum ada gambar terpilih")
         self.selected_image_label.setStyleSheet("""
-            color: #95a5a6;
+            color: #95a5a5;
             font-size: 12px;
             margin-top: 8px;
         """)
@@ -807,7 +814,7 @@ class CustomizeTab(QWidget):
         # Add selected sound label
         self.selected_sound_label = QLabel("Belum ada suara terpilih")
         self.selected_sound_label.setStyleSheet("""
-            color: #95a5a6;
+            color: #95a5a5;
             font-size: 12px;
             margin-top: 8px;
         """)
@@ -1041,6 +1048,43 @@ class CustomizeTab(QWidget):
         use_custom_sound = self.custom_sound_radio.isChecked()
         QMessageBox.information(self, "Success", "Settings saved successfully!")
 
+class HistoryTab(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Riwayat Reminder")
+        self.setMinimumSize(500, 600)
+        self.layout = QVBoxLayout()
+        self.layout.setContentsMargins(32, 24, 32, 24)
+        self.layout.setSpacing(18)
+
+        title_label = QLabel("Riwayat Reminder")
+        title_label.setStyleSheet("font-size: 20px; font-weight: bold; margin-bottom: 8px;")
+        self.layout.addWidget(title_label)
+
+        self.history_list = QListWidget()
+        self.history_list.setStyleSheet("""
+            QListWidget {
+                border: 1px solid #bbb;
+                border-radius: 8px;
+                padding: 8px;
+                font-size: 15px;
+                min-height: 180px;
+            }
+            QListWidget::item:selected {
+                background: #fde8e7;
+                color: #E74C3C;
+            }
+        """)
+        self.layout.addWidget(self.history_list)
+        self.setLayout(self.layout)
+        self.refresh_history()
+
+    def refresh_history(self):
+        self.history_list.clear()
+        # --- Tampilkan semua history, baik yang lewat maupun dihapus ---
+        for r in history:
+            self.history_list.addItem(f"{r['title']} | {r['datetime'].strftime('%Y-%m-%d %H:%M:%S')}")
+
 def play_alarm(alarm_type="regular"):
     try:
         if use_custom_sound and selected_sound and os.path.exists(selected_sound):
@@ -1153,6 +1197,8 @@ def auto_delete_old_reminders(window):
             if r['datetime'] < now:
                 to_delete.append(i)
         for i in reversed(to_delete):
+            # --- Tambahkan ke history sebelum dihapus ---
+            history.append(reminders[i])
             del reminders[i]
             window.reminder_tab.reminder_list.takeItem(i)
         time.sleep(5) #h
