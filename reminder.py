@@ -825,6 +825,54 @@ class CustomizeTab(QWidget):
         sound_card.setLayout(sound_layout)
         layout.addWidget(sound_card)
 
+        # Test Notification Card
+        test_card = QWidget()
+        test_card.setObjectName("settingsCard")
+        test_layout = QVBoxLayout()
+        test_layout.setSpacing(16)
+
+        # Test Header
+        test_header = QHBoxLayout()
+        test_icon = QLabel("🔔")
+        test_icon.setStyleSheet("font-size: 24px;")
+        test_title = QLabel("Test Settings")
+        test_title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        test_header.addWidget(test_icon)
+        test_header.addWidget(test_title)
+        test_header.addStretch()
+        test_layout.addLayout(test_header)
+
+        # Test Description
+        test_desc = QLabel("Test notifikasi untuk melihat pengaturan yang telah kamu pilih.")
+        test_desc.setStyleSheet("""
+            color: #95a5a5;
+            font-size: 14px;
+            margin-bottom: 12px;
+        """)
+        test_layout.addWidget(test_desc)
+
+        # Test Button
+        self.test_button = QPushButton("🔔 Test Notification")
+        self.test_button.setStyleSheet("""
+            QPushButton {
+                background: #E74C3C;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-weight: 500;
+                margin: 4px 0;
+            }
+            QPushButton:hover {
+                background: #c0392b;
+            }
+        """)
+        self.test_button.clicked.connect(self.preview_reminder)
+        test_layout.addWidget(self.test_button)
+
+        test_card.setLayout(test_layout)
+        layout.addWidget(test_card)
+
         # Add global styles
         self.setStyleSheet("""
             QWidget#settingsCard {
@@ -1027,7 +1075,13 @@ class CustomizeTab(QWidget):
                 QMessageBox.warning(self, "Error", f"Failed to play sound: {e}")
     
     def preview_reminder(self):
-        notification.notify(title="Test Reminder", message="This is a test reminder", timeout=10)
+        notification.notify(
+            title="Test Notification",
+            message="Testing your current notification settings",
+            timeout=10
+        )
+        
+        # Test sound
         if use_custom_sound and selected_sound:
             try:
                 pygame.mixer.music.load(selected_sound)
@@ -1037,6 +1091,7 @@ class CustomizeTab(QWidget):
         else:
             play_alarm()
         
+        # Test image
         if use_custom_image and selected_image:
             popup_manager.show_image_signal.emit(selected_image)
         else:
