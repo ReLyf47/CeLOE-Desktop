@@ -271,57 +271,115 @@ class MainWindow(QMainWindow):
         self.update_tab_highlight()
 
     def update_tab_highlight(self):
+        base_style = """
+            QPushButton {
+                border: none;
+                padding: 12px 24px;
+                font-size: 14px;
+                text-align: left;
+                min-width: 120px;
+                max-width: 160px;
+            }
+        """
+        
+        active_style = base_style + """
+            QPushButton {
+                background: #fde8e7;
+                font-weight: 600;
+                color: #E74C3C;
+                border-radius: 8px;
+            }
+        """
+        
+        inactive_style = base_style + """
+            QPushButton {
+                background: transparent;
+                font-weight: 500;
+                color: #95a5a6;
+            }
+            QPushButton:hover {
+                background: #f8f9fa;
+                color: #E74C3C;
+                border-radius: 8px;
+            }
+        """
+
         for i, btn in enumerate(self.tab_buttons):
             if i == self.active_tab_index:
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background: #fde8e7;
-                        border: none;
-                        padding: 12px 24px;
-                        font-weight: 600;
-                        font-size: 14px;
-                        color: #E74C3C;
-                        text-align: left;
-                        border-radius: 8px;
-                    }
-                """)
+                btn.setStyleSheet(active_style)
             else:
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background: transparent;
-                        border: none;
-                        padding: 12px 24px;
-                        font-weight: 500;
-                        font-size: 14px;
-                        color: #95a5a6;
-                        text-align: left;
-                    }
-                    QPushButton:hover {
-                        background: #f8f9fa;
-                        color: #E74C3C;
-                        border-radius: 8px;
-                    }
-                """)
+                btn.setStyleSheet(inactive_style)
 
     def apply_theme(self):
         stylesheet = get_dark_stylesheet() if self.dark_mode else get_light_stylesheet()
         self.setStyleSheet(stylesheet)
-        # Ubah warna tombol sesuai mode
+
+        base_style = """
+            QPushButton {
+                border: none;
+                padding: 12px 24px;
+                font-size: 14px;
+                text-align: left;
+                min-width: 120px;
+                max-width: 160px;
+            }
+        """
+        
         if self.dark_mode:
-            highlight_bg = "#2d1a1a"
-            btn_style = "background: transparent; border: none; padding: 12px 8px; font-weight: bold; font-size: 14px; color: #e57373; text-align: left;"
-            highlight_style = f"background: {highlight_bg}; border: none; padding: 12px 8px; font-weight: bold; font-size: 14px; color: #e57373; text-align: left; border-radius: 8px;"
+            active_style = base_style + """
+                QPushButton {
+                    background: #2d1a1a;
+                    font-weight: 600;
+                    color: #e57373;
+                    border-radius: 8px;
+                }
+            """
+            
+            inactive_style = base_style + """
+                QPushButton {
+                    background: transparent;
+                    font-weight: 500;
+                    color: #95a5a6;
+                }
+                QPushButton:hover {
+                    background: #262626;
+                    color: #e57373;
+                    border-radius: 8px;
+                }
+            """
+            
             toolbar_style = "QToolBar { background: #121212; border: none; padding: 0; }"
         else:
-            highlight_bg = "#ffeaea"
-            btn_style = "background: transparent; border: none; padding: 12px 8px; font-weight: bold; font-size: 14px; color: #b00; text-align: left;"
-            highlight_style = f"background: {highlight_bg}; border: none; padding: 12px 8px; font-weight: bold; font-size: 14px; color: #b00; text-align: left; border-radius: 8px;"
+            active_style = base_style + """
+                QPushButton {
+                    background: #fde8e7;
+                    font-weight: 600;
+                    color: #E74C3C;
+                    border-radius: 8px;
+                }
+            """
+            
+            inactive_style = base_style + """
+                QPushButton {
+                    background: transparent;
+                    font-weight: 500;
+                    color: #95a5a6;
+                }
+                QPushButton:hover {
+                    background: #f8f9fa;
+                    color: #E74C3C;
+                    border-radius: 8px;
+                }
+            """
+            
             toolbar_style = "QToolBar { background: white; border: none; padding: 0; }"
+
         for i, btn in enumerate(self.tab_buttons):
             if i == self.active_tab_index:
-                btn.setStyleSheet(highlight_style)
+                btn.setStyleSheet(active_style)
             else:
-                btn.setStyleSheet(btn_style)
+                btn.setStyleSheet(inactive_style)
+                
         self.findChild(QToolBar).setStyleSheet(toolbar_style)
 
 def get_dark_stylesheet():
@@ -843,7 +901,7 @@ class CustomizeTab(QWidget):
         test_layout.addLayout(test_header)
 
         # Test Description
-        test_desc = QLabel("Test notifikasi untuk melihat pengaturan yang telah kamu pilih.")
+        test_desc = QLabel("Test notifikasi")
         test_desc.setStyleSheet("""
             color: #95a5a5;
             font-size: 14px;
