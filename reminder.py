@@ -36,7 +36,7 @@ for directory in directories:
     directory.mkdir(exist_ok=True)
 
 reminders = []
-history = []  # Tambahkan di bagian global
+history = []
 use_custom_image = False
 use_custom_sound = False
 selected_image = None
@@ -125,7 +125,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CELOE Reminder App")
-        self.setMinimumSize(720, 720)
+        self.setMinimumSize(720, 850)
 
         # Central widget untuk ganti konten
         self.central_widget = QWidget()
