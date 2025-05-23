@@ -127,6 +127,7 @@ class PopupManager(QObject):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.tray_icon = create_system_tray(QApplication.instance(), self)
         self.setWindowTitle("CeLOE Reminder App")
         self.setMinimumSize(720, 850)
 
@@ -327,6 +328,16 @@ class MainWindow(QMainWindow):
             else:
                 btn.setStyleSheet(btn_style)
         self.findChild(QToolBar).setStyleSheet(toolbar_style)
+
+    def closeEvent(self, event):
+        event.ignore()
+        self.hide()
+        self.tray_icon.showMessage(
+            "Reminder",
+            "Running in background. Right-click the tray icon to reopen or exit.",
+            QSystemTrayIcon.Information,
+            3000
+        )
 
 def get_dark_stylesheet():
     return """
@@ -1253,16 +1264,34 @@ def run_scheduler():
 def create_system_tray(app, window):
     tray_icon = QSystemTrayIcon(QIcon(str(ICON_PATH)), app)
     tray_menu = QMenu()
-    open_action = tray_menu.addAction("Buka Aplikasi")
-    open_action.triggered.connect(window.show)
-    show_reminders_action = tray_menu.addAction("Lihat Reminders")
-    show_reminders_action.triggered.connect(show_reminders_notification)
+
+    # CeLOE Submenu
     celoe_menu = tray_menu.addMenu("CeLOE")
-    celoe_action = celoe_menu.addAction("Masuk ke Reminder App")
+    celoe_action = celoe_menu.addAction("Open Browser")
+    celoe_action.triggered.connect(lambda: window.show_page(window.celoe_tab, 0))
     celoe_action.triggered.connect(window.show)
+
+    # Reminder Submenu
+    reminder_menu = tray_menu.addMenu("Reminder")
+    reminder_list_action = reminder_menu.addAction("Reminder List")
+    reminder_list_action.triggered.connect(lambda: window.show_page(window.reminder_tab, 1))
+    reminder_list_action.triggered.connect(window.show)
+
+    history_action = reminder_menu.addAction("History")
+    history_action.triggered.connect(lambda: window.show_page(window.history_tab, 2))
+    history_action.triggered.connect(window.show)
+
+    # Customize
+    customize_action = tray_menu.addAction("Customize")
+    customize_action.triggered.connect(lambda: window.show_page(window.customize_tab, 3))
+    customize_action.triggered.connect(window.show)
+
     tray_menu.addSeparator()
-    quit_action = tray_menu.addAction("Keluar")
+
+    # Quit
+    quit_action = tray_menu.addAction("Exit")
     quit_action.triggered.connect(app.quit)
+
     tray_icon.setContextMenu(tray_menu)
     tray_icon.show()
     return tray_icon
@@ -1342,7 +1371,6 @@ if __name__ == "__main__":
 
     # Continue setup
     popup_manager = PopupManager()
-    tray_icon = create_system_tray(app, window)
     threading.Thread(target=run_scheduler, daemon=True).start()
     threading.Thread(target=auto_delete_old_reminders, args=(window,), daemon=True).start()
     app.aboutToQuit.connect(save_config)
