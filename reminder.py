@@ -65,7 +65,7 @@ class ImagePopup(QWidget):
             self.pixmap = QPixmap(image_path)
             self.adjust_size()
         self.center_on_screen()
-        self.timer = threading.Timer(10.0, self.close)
+        self.timer = threading.Timer(20.0, self.close)
         self.timer.start()
 
     def adjust_size(self, frame_num=0):
