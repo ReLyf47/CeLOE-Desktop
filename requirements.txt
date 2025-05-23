@@ -1,0 +1,6 @@
+PyQt5
+PyQtWebEngine
+pygame
+schedule
+plyer
+pathlib
