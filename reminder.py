@@ -39,6 +39,7 @@ for directory in directories:
 
 reminders = []
 history = []
+dark_mode = False
 use_custom_image = False
 use_custom_sound = False
 selected_image = None
@@ -1296,13 +1297,16 @@ def save_config():
         "use_custom_image": use_custom_image,
         "use_custom_sound": use_custom_sound,
         "selected_image": selected_image,
-        "selected_sound": selected_sound
+        "selected_sound": selected_sound,
+        "dark_mode": window.dark_mode
     }
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=2)
 
 def load_config():
-    global reminders, history, use_custom_image, use_custom_sound, selected_image, selected_sound
+    global reminders, history, use_custom_image, use_custom_sound
+    global selected_image, selected_sound, dark_mode
+
     if CONFIG_FILE.exists():
         with open(CONFIG_FILE, "r") as f:
             config = json.load(f)
@@ -1318,17 +1322,29 @@ def load_config():
         use_custom_sound = config.get("use_custom_sound", False)
         selected_image = config.get("selected_image", None)
         selected_sound = config.get("selected_sound", None)
+        dark_mode = config.get("dark_mode", False) 
         for r in reminders:
             schedule_notification(r["title"], r["datetime"])
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    
+    # Load config first
     load_config()
+    
+    # Create window
     window = MainWindow()
+
+    # Apply loaded dark mode BEFORE showing the UI
+    window.dark_mode = dark_mode
+    window.theme_toggle.toggle_position = 1 if dark_mode else 0
+    window.apply_theme()
+
+    # Continue setup
     popup_manager = PopupManager()
     tray_icon = create_system_tray(app, window)
     threading.Thread(target=run_scheduler, daemon=True).start()
     threading.Thread(target=auto_delete_old_reminders, args=(window,), daemon=True).start()
-    window.show()
     app.aboutToQuit.connect(save_config)
+    window.show()
     sys.exit(app.exec_())
