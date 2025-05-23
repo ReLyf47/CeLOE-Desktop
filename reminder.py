@@ -3,6 +3,7 @@ import threading
 import time
 import random
 import os
+import json
 import shutil
 import pygame
 import schedule
@@ -27,6 +28,7 @@ ALARM_SOUND_PATH = BASE_DIR / "alarm"
 ICON_PATH = BASE_DIR / "img" / "icon.png"
 CUSTOM_IMG_PATH = BASE_DIR / "custom_images"
 CUSTOM_SOUND_PATH = BASE_DIR / "custom_sounds"
+CONFIG_FILE = BASE_DIR / "config.json"
 
 directories = [
     CUSTOM_IMG_PATH, CUSTOM_SOUND_PATH, ALARM_SOUND_PATH,
@@ -124,7 +126,7 @@ class PopupManager(QObject):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("CELOE Reminder App")
+        self.setWindowTitle("CeLOE Reminder App")
         self.setMinimumSize(720, 850)
 
         # Central widget untuk ganti konten
@@ -138,6 +140,7 @@ class MainWindow(QMainWindow):
         self.celoe_tab = BrowserTab()
         self.customize_tab = CustomizeTab()
         self.history_tab = HistoryTab()  # Add history tab
+        self.reminder_tab.refresh_reminder_list()
 
         # --- NAVBAR KIRI: pakai QToolBar vertikal ---
         toolbar = QToolBar("MainToolbar")
@@ -633,6 +636,11 @@ class ReminderTab(QWidget):
         cancel_scheduled(title)
         del reminders[selected]
         self.reminder_list.takeItem(selected)
+    
+    def refresh_reminder_list(self):
+        self.reminder_list.clear()
+        for r in reminders:
+            self.reminder_list.addItem(f"{r['title']} | {r['datetime'].strftime('%Y-%m-%d %H:%M:%S')}")
 
 class BrowserTab(QWidget):
     def __init__(self):
@@ -984,7 +992,25 @@ class CustomizeTab(QWidget):
 
         layout.addStretch()
         self.setLayout(layout)
-
+                # Reflect saved toggle states and preview
+        self.select_image_button.setEnabled(use_custom_image)
+        self.image_switch.toggle_position = 1 if use_custom_image else 0
+        self.image_switch.update()
+        
+        if selected_image and os.path.exists(selected_image):
+            pixmap = QPixmap(selected_image)
+            self.image_preview.setPixmap(pixmap.scaled(180, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.selected_image_label.setText(f"Terpilih: {os.path.basename(selected_image)}")
+        
+        self.select_sound_button.setEnabled(use_custom_sound)
+        self.test_sound_button.setEnabled(use_custom_sound and selected_sound is not None)
+        self.sound_switch.toggle_position = 1 if use_custom_sound else 0
+        self.sound_switch.update()
+        
+        if selected_sound and os.path.exists(selected_sound):
+            self.selected_sound_label.setText(f"Terpilih: {os.path.basename(selected_sound)}")
+        
+        
     def paint_switch(self, event, switch):
         painter = QPainter(switch)
         painter.setRenderHint(QPainter.Antialiasing)
@@ -1230,7 +1256,7 @@ def create_system_tray(app, window):
     open_action.triggered.connect(window.show)
     show_reminders_action = tray_menu.addAction("Lihat Reminders")
     show_reminders_action.triggered.connect(show_reminders_notification)
-    celoe_menu = tray_menu.addMenu("Celoe")
+    celoe_menu = tray_menu.addMenu("CeLOE")
     celoe_action = celoe_menu.addAction("Masuk ke Reminder App")
     celoe_action.triggered.connect(window.show)
     tray_menu.addSeparator()
@@ -1257,13 +1283,52 @@ def auto_delete_old_reminders(window):
             del reminders[i]
             window.reminder_tab.reminder_list.takeItem(i)
         time.sleep(5)
+def save_config():
+    config = {
+        "reminders": [
+            {"title": r["title"], "datetime": r["datetime"].isoformat()}
+            for r in reminders
+        ],
+        "history": [
+            {"title": r["title"], "datetime": r["datetime"].isoformat()}
+            for r in history
+        ],
+        "use_custom_image": use_custom_image,
+        "use_custom_sound": use_custom_sound,
+        "selected_image": selected_image,
+        "selected_sound": selected_sound
+    }
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f, indent=2)
+
+def load_config():
+    global reminders, history, use_custom_image, use_custom_sound, selected_image, selected_sound
+    if CONFIG_FILE.exists():
+        with open(CONFIG_FILE, "r") as f:
+            config = json.load(f)
+        reminders = [
+            {"title": r["title"], "datetime": datetime.fromisoformat(r["datetime"])}
+            for r in config.get("reminders", [])
+        ]
+        history = [
+            {"title": r["title"], "datetime": datetime.fromisoformat(r["datetime"])}
+            for r in config.get("history", [])
+        ]
+        use_custom_image = config.get("use_custom_image", False)
+        use_custom_sound = config.get("use_custom_sound", False)
+        selected_image = config.get("selected_image", None)
+        selected_sound = config.get("selected_sound", None)
+        for r in reminders:
+            schedule_notification(r["title"], r["datetime"])
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    load_config()
     window = MainWindow()
     popup_manager = PopupManager()
     tray_icon = create_system_tray(app, window)
     threading.Thread(target=run_scheduler, daemon=True).start()
     threading.Thread(target=auto_delete_old_reminders, args=(window,), daemon=True).start()
     window.show()
+    app.aboutToQuit.connect(save_config)
     sys.exit(app.exec_())
