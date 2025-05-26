@@ -1,0 +1,97 @@
+name: Build and Release Windows MSI Installer
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0, v2.1.0, etc.
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  build-windows-msi:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'  # Adjust version as needed
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install cx_Freeze
+        # Install your app dependencies if you have a requirements.txt
+        pip install -r requirements.txt
+        
+    - name: Create setup.py for cx_Freeze
+      run: |
+        @"
+        import sys
+        from cx_Freeze import setup, Executable
+        
+        # Dependencies are automatically detected, but it might need fine tuning.
+        build_options = {
+            'packages': [],
+            'excludes': [],
+            'include_files': [
+                ('alarm', 'alarm'),
+                ('alarm1', 'alarm1'), 
+                ('alarm24', 'alarm24'),
+                ('img', 'img')
+            ]
+        }
+        
+        # GUI applications require a different base on Windows (the default is for
+        # a console application).
+        base = 'Win32GUI' if sys.platform == 'win32' else None
+        
+        executables = [
+            Executable('reminder.py', base=base, target_name='reminder.exe')
+        ]
+        
+        setup(
+            name='CeLOE Desktop',
+            version='1.0.0',
+            description='CeLOE Desktop',
+            options={'build_exe': build_options, 'bdist_msi': {}},
+            executables=executables
+        )
+        "@ | Out-File -FilePath setup.py -Encoding utf8
+        
+    - name: Build MSI installer
+      run: |
+        python setup.py bdist_msi
+        
+    - name: Find MSI file
+      run: |
+        $msiFile = Get-ChildItem -Path "dist" -Filter "*.msi" | Select-Object -First 1
+        echo "MSI_FILE=$($msiFile.FullName)" >> $env:GITHUB_ENV
+        echo "MSI_NAME=$($msiFile.Name)" >> $env:GITHUB_ENV
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: reminder-windows-msi
+        path: ${{ env.MSI_FILE }}
+        
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ${{ env.MSI_FILE }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        name: Release ${{ github.ref_name }}
+        body: |
+          ## Windows MSI Installer
+          
+          Download and run the MSI file to install the Reminder application.
+          
+          **Installation**: Double-click the MSI file and follow the installation wizard.
+          **Uninstallation**: Use Windows "Add or Remove Programs" to uninstall.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

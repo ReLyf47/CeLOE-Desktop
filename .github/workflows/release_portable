@@ -26,9 +26,9 @@ jobs:
         # Install your app dependencies if you have a requirements.txt
         pip install -r requirements.txt
         
-    - name: Build executable with PyInstaller
+    - name: Build standalone executable with PyInstaller
       run: |
-        pyinstaller reminder.py --onefile --add-data "alarm;alarm" --add-data "alarm1;alarm1" --add-data "alarm24;alarm24" --add-data "img;img" --name reminder-windows
+        pyinstaller reminder.py --onefile --noconsole --add-data "alarm;alarm" --add-data "alarm1;alarm1" --add-data "alarm24;alarm24" --add-data "img;img" --icon=img/icon.png --name CeLOE-Desktop
         
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -44,5 +44,18 @@ jobs:
         draft: false
         prerelease: false
         generate_release_notes: true
+        name: Release ${{ github.ref_name }}
+        body: |
+          ## Windows Standalone Executable
+          
+          Download the .exe file and run it directly - no installation required!
+          
+          **Features:**
+          - No Python installation needed
+          - No terminal/command prompt window
+          - Completely standalone executable
+          - Just download and double-click to run
+          
+          **Note:** Windows may show a security warning for unsigned executables. Click "More info" then "Run anyway" if prompted.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
