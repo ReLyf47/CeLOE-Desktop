@@ -3,4 +3,3 @@ PyQtWebEngine
 pygame
 schedule
 plyer
-pathlib
