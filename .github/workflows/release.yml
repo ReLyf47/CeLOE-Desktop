@@ -72,3 +72,52 @@ jobs:
           files: reminder.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+name: Build and Release Windows Executable
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0, v2.1.0, etc.
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'  # Adjust version as needed
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        # Install your app dependencies if you have a requirements.txt
+        # pip install -r requirements.txt
+        
+    - name: Build executable with PyInstaller
+      run: |
+        pyinstaller reminder.py --onefile --add-data "alarm;alarm" --add-data "alarm1;alarm1" --add-data "alarm24;alarm24" --add-data "img;img" --name reminder-windows
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: reminder-windows-executable
+        path: dist/reminder-windows.exe
+        
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/reminder-windows.exe
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -11,3 +11,4 @@ AppDir/
 reminder.spec
 setup.py
 *.AppImage
+MyApp/
