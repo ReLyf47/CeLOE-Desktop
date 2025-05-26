@@ -65,10 +65,10 @@ jobs:
           chmod +x AppDir/usr/bin/reminder
           
           # Create desktop file
-          cat > AppDir/usr/share/applications/reminder.desktop << EOF
+          cat > AppDir/usr/share/applications/CeLOE_Desktop.desktop << EOF
           [Desktop Entry]
           Name=Reminder
-          Comment=A reminder application
+          Comment=A Desktop Version of CeLOE
           Exec=reminder
           Icon=reminder
           Type=Application
@@ -78,7 +78,7 @@ jobs:
           EOF
           
           # Copy desktop file to AppDir root
-          cp AppDir/usr/share/applications/reminder.desktop AppDir/
+          cp AppDir/usr/share/applications/CeLOE_Desktop.desktop AppDir/
           
           # Handle icon
           if [ -f "img/icon.png" ]; then
@@ -110,10 +110,10 @@ jobs:
           ./appimagetool.AppImage --appimage-extract
           
           # Build the AppImage
-          ./squashfs-root/AppRun AppDir reminder.AppImage
+          ./squashfs-root/AppRun AppDir CeLOE_Desktop.AppImage
           
           # Make sure the AppImage is executable
-          chmod +x reminder.AppImage
+          chmod +x CeLOE_Desktop.AppImage
           
       - name: Get version info
         id: version
@@ -128,31 +128,31 @@ jobs:
           
       - name: Rename AppImage with version
         run: |
-          mv reminder.AppImage reminder-${{ steps.version.outputs.version }}.AppImage
+          mv CeLOE_Desktop.AppImage CeLOE_Desktop-${{ steps.version.outputs.version }}.AppImage
           
       - name: Upload AppImage as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: reminder-appimage-${{ steps.version.outputs.version }}
-          path: reminder-${{ steps.version.outputs.version }}.AppImage
+          name: CeLOE_Desktop-appimage-${{ steps.version.outputs.version }}
+          path: CeLOE_Desktop-${{ steps.version.outputs.version }}.AppImage
           retention-days: 30
           
       - name: Create Release
         if: steps.version.outputs.is_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          files: reminder-${{ steps.version.outputs.version }}.AppImage
+          files: CeLOE_Desktop-${{ steps.version.outputs.version }}.AppImage
           tag_name: ${{ steps.version.outputs.version }}
           name: Release ${{ steps.version.outputs.version }}
           body: |
-            ## Reminder AppImage Release ${{ steps.version.outputs.version }}
+            ## CeLOE Desktop AppImage Release ${{ steps.version.outputs.version }}
             
             Built on Arch Linux with PyInstaller and AppImageTool.
             
             ### Installation
             1. Download the AppImage file
-            2. Make it executable: `chmod +x reminder-${{ steps.version.outputs.version }}.AppImage`
-            3. Run it: `./reminder-${{ steps.version.outputs.version }}.AppImage`
+            2. Make it executable: `chmod +x CeLOE_Desktop-${{ steps.version.outputs.version }}.AppImage`
+            3. Run it: `./CeLOE_Desktop-${{ steps.version.outputs.version }}.AppImage`
             
             ### Changes
             - Auto-generated release from commit ${{ github.sha }}
