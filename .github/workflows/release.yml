@@ -33,7 +33,14 @@ jobs:
           --add-data "alarm24:alarm24" \
           --add-data "img:img"
 
-    - name: Package into AppImage
+    - name: Download and extract linuxdeploy
+      run: |
+        wget -O linuxdeploy.AppImage https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+        chmod +x linuxdeploy.AppImage
+        ./linuxdeploy.AppImage --appimage-extract
+        mv squashfs-root linuxdeploy-dir
+
+    - name: Build AppImage using extracted linuxdeploy
       run: |
         mkdir -p AppDir/usr/bin
         cp dist/reminder AppDir/usr/bin/reminder
@@ -44,7 +51,7 @@ jobs:
         mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
         cp img/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/alarm.png || true
 
-        linuxdeploy-extracted AppDir -o appimage
+        ./linuxdeploy-dir/AppRun --appdir AppDir -o appimage
         mv Reminder*.AppImage reminder.AppImage
 
     - name: Upload to GitHub Release
