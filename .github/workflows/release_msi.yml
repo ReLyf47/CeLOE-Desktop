@@ -74,7 +74,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: CeLOE_Desktop
+        name: CeLOE_Desktop-msi
         path: ${{ env.MSI_FILE }}
         
     - name: Create Release

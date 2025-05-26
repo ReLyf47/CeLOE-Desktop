@@ -28,19 +28,19 @@ jobs:
         
     - name: Build standalone executable with PyInstaller
       run: |
-        pyinstaller reminder.py --onefile --noconsole --add-data "alarm;alarm" --add-data "alarm1;alarm1" --add-data "alarm24;alarm24" --add-data "img;img" --icon=img/icon.png --name CeLOE_Desktop
+        pyinstaller reminder.py --onefile --noconsole --add-data "alarm;alarm" --add-data "alarm1;alarm1" --add-data "alarm24;alarm24" --add-data "img;img" --icon=img/icon.png --name CeLOE_Desktop-portable
         
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: CeLOE_Desktop
-        path: dist/CeLOE_Desktop.exe
+        name: CeLOE_Desktop-portable
+        path: dist/CeLOE_Desktop-portable.exe
         
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: dist/CeLOE_Desktop.exe
+        files: dist/CeLOE_Desktop-portable.exe
         draft: false
         prerelease: false
         generate_release_notes: true
