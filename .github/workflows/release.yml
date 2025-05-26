@@ -50,6 +50,7 @@ jobs:
         echo -e '[Desktop Entry]\nName=Reminder\nExec=reminder\nIcon=alarm\nType=Application\nCategories=Utility;' > AppDir/reminder.desktop
         mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
         cp img/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/alarm.png || true
+        cp img/icon.png AppDir/alarm.png
 
         ./linuxdeploy-dir/AppRun --appdir AppDir -o appimage
         mv Reminder*.AppImage reminder.AppImage
