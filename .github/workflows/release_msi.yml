@@ -24,14 +24,30 @@ jobs:
         shell: pwsh
         run: |
           if ("${{ github.ref }}".StartsWith("refs/tags/")) {
-            $version = "${{ github.ref }}".Replace("refs/tags/", "")
-            echo "version=$version" >> $env:GITHUB_OUTPUT
+            $rawVersion = "${{ github.ref }}".Replace("refs/tags/", "")
+            # Clean version for MSI (remove 'v' prefix and any non-numeric suffixes)
+            $cleanVersion = $rawVersion -replace '^v', '' -replace '-.*$', ''
+            # Ensure it's in X.Y.Z format
+            if ($cleanVersion -notmatch '^\d+\.\d+\.\d+$') {
+              if ($cleanVersion -match '^(\d+)\.(\d+)$') {
+                $cleanVersion = "$cleanVersion.0"
+              } elseif ($cleanVersion -match '^(\d+)$') {
+                $cleanVersion = "$cleanVersion.0.0"
+              } else {
+                $cleanVersion = "1.0.0"
+              }
+            }
+            echo "version=$rawVersion" >> $env:GITHUB_OUTPUT
+            echo "msi_version=$cleanVersion" >> $env:GITHUB_OUTPUT
             echo "is_release=true" >> $env:GITHUB_OUTPUT
           } else {
             $date = Get-Date -Format "yyyyMMdd"
             $sha = "${{ github.sha }}".Substring(0,7)
             $version = "$date-$sha"
+            # For non-release builds, use date-based version
+            $msiVersion = "0.$(Get-Date -Format 'yyyyMMdd').$(Get-Date -Format 'HHmm')"
             echo "version=$version" >> $env:GITHUB_OUTPUT
+            echo "msi_version=$msiVersion" >> $env:GITHUB_OUTPUT
             echo "is_release=false" >> $env:GITHUB_OUTPUT
           }
 
@@ -68,7 +84,7 @@ jobs:
           echo "" >> setup.py
           echo "setup(" >> setup.py
           echo "    name='CeLOE Desktop'," >> setup.py
-          echo "    version='${{ steps.version.outputs.version }}'," >> setup.py
+          echo "    version='${{ steps.version.outputs.msi_version }}'," >> setup.py
           echo "    description='CeLOE Desktop Reminder Application'," >> setup.py
           echo "    options={'build_exe': build_options, 'bdist_msi': {}}," >> setup.py
           echo "    executables=executables" >> setup.py
@@ -80,7 +96,7 @@ jobs:
           Get-ChildItem -Path "dist" -Recurse
 
       - name: Find MSI File
-        id: msi_info
+        id: find_msi
         shell: pwsh
         run: |
           $msi = Get-ChildItem -Path "dist" -Filter *.msi -Recurse | Select-Object -First 1
@@ -88,8 +104,6 @@ jobs:
             Write-Host "❌ No MSI file found!"
             exit 1
           }
-          echo "MSI_FILE=$($msi.FullName)" >> $env:GITHUB_ENV
-          echo "MSI_NAME=$($msi.Name)" >> $env:GITHUB_ENV
           echo "msi_file=$($msi.FullName)" >> $env:GITHUB_OUTPUT
           echo "msi_name=$($msi.Name)" >> $env:GITHUB_OUTPUT
 
@@ -97,14 +111,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: CeLOE_Desktop-msi-${{ steps.version.outputs.version }}
-          path: ${{ steps.msi_info.outputs.msi_file }}
+          path: ${{ steps.find_msi.outputs.msi_file }}
           retention-days: 30
 
       - name: Create GitHub Release
         if: steps.version.outputs.is_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.msi_info.outputs.msi_file }}
+          files: ${{ steps.find_msi.outputs.msi_file }}
           tag_name: ${{ steps.version.outputs.version }}
           name: Release ${{ steps.version.outputs.version }}
           draft: false
@@ -116,7 +130,7 @@ jobs:
             Download and run the MSI file to install the CeLOE Desktop Reminder.
 
             ### Installation
-            1. Download the MSI file: `${{ steps.msi_info.outputs.msi_name }}`
+            1. Download the MSI file: `${{ steps.find_msi.outputs.msi_name }}`
             2. Run the installer
             3. App will be installed and available in the Start Menu
 
@@ -134,5 +148,5 @@ jobs:
           echo "=== DEBUG ==="
           echo "Version: ${{ steps.version.outputs.version }}"
           echo "Is release: ${{ steps.version.outputs.is_release }}"
-          echo "MSI File: ${{ steps.msi_info.outputs.msi_file }}"
-          echo "Exists: $(Test-Path '${{ steps.msi_info.outputs.msi_file }}')"
+          echo "MSI File: ${{ steps.find_msi.outputs.msi_file }}"
+          echo "Exists: $(Test-Path '${{ steps.find_msi.outputs.msi_file }}')"
