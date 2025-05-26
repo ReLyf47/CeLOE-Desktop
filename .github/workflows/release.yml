@@ -24,14 +24,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install pyinstaller
         # Install your app dependencies if you have a requirements.txt
-        # pip install -r requirements.txt
+        pip install -r requirements.txt
         
     - name: Build executable with PyInstaller
       run: |
         pyinstaller reminder.py --onefile --add-data "alarm;alarm" --add-data "alarm1;alarm1" --add-data "alarm24;alarm24" --add-data "img;img" --name reminder-windows
         
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: reminder-windows-executable
         path: dist/reminder-windows.exe
