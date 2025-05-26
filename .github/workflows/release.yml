@@ -14,8 +14,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    
     steps:
-    - name: Checkout code
+    - name: Checkout tag for manual runs
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.tag }}
+
+    - name: Checkout for pushes (tags)
+      if: ${{ github.event_name == 'push' }}
       uses: actions/checkout@v4
 
     - name: Set up Python
@@ -58,12 +66,7 @@ jobs:
 
         ./linuxdeploy-dir/AppRun --appdir AppDir -o appimage
         mv Reminder*.AppImage reminder.AppImage
-
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.ref || github.event.inputs.tag || github.ref }}
-
+      
     - name: Upload to GitHub Release
       uses: softprops/action-gh-release@v2
       with:
