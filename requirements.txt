@@ -3,3 +3,4 @@ PyQtWebEngine
 pygame
 schedule
 plyer
+pillow
