@@ -15,7 +15,7 @@ It features image and sound alerts, history tracking, and runs quietly in the sy
 
 ---
 
-## Installation
+## Building it yourself
 
 ### Requirements
 
@@ -28,6 +28,8 @@ Install the required Python packages:
 
 ```bash
 pip install -r requirements.txt
+pip install pyinstaller
+pyinstaller reminder.py --onefile --add-data "alarm:alarm" --add-data "alarm1:alarm1" --add-data "alarm24:alarm24" --add-data "img:img"
 ```
 
 ## Screenshots

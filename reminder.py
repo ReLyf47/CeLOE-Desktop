@@ -7,35 +7,48 @@ import json
 import shutil
 import pygame
 import schedule
+import platform
+import math
 from datetime import datetime, timedelta
 from plyer import notification
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout,QToolBar,
     QVBoxLayout, QPushButton, QListWidget, QDateTimeEdit, QMessageBox,
-    QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit, QFileDialog, QGroupBox, QRadioButton, QSizePolicy, QToolBar
+    QMainWindow, QSystemTrayIcon, QMenu, QTimeEdit, QFileDialog, QGroupBox, QRadioButton, QSizePolicy, QToolBar, QDialog
 )
-from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize, QTime, QObject, pyqtSignal, QPropertyAnimation
+from PyQt5.QtCore import Qt, QDateTime, QUrl, QSize, QTime, QObject, pyqtSignal, QPropertyAnimation, QPoint, QTimer
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtGui import QIcon, QPixmap, QMovie, QPainter, QColor, QPen
+from PyQt5.QtGui import QIcon, QPixmap, QMovie, QPainter, QColor, QPen, QFont, QBrush, QPolygon
 from pathlib import Path
 
+
 # Constants and Paths
-BASE_DIR = Path(__file__).resolve().parent
-CHAR_IMG_PATH = BASE_DIR / "chara"
-ALARM_24H_PATH = BASE_DIR / "alarm24"
-ALARM_1H_PATH = BASE_DIR / "alarm1" 
-ALARM_SOUND_PATH = BASE_DIR / "alarm"
-ICON_PATH = BASE_DIR / "img" / "icon.png"
+if getattr(sys, 'frozen', False):
+    RESOURCE_DIR = Path(sys._MEIPASS)  # PyInstaller temp folder
+else:
+    RESOURCE_DIR = Path(__file__).resolve().parent
+
+if platform.system() == "Windows":
+    BASE_DIR = Path(os.getenv("APPDATA")) / "CeLOE-Reminder"
+elif platform.system() == "Darwin":
+    BASE_DIR = Path.home() / "Library/Application Support/CeLOE-Reminder"
+else:
+    BASE_DIR = Path.home() / ".local/share/CeLOE-Reminder"
+BASE_DIR.mkdir(parents=True, exist_ok=True)
+ICON_PATH = RESOURCE_DIR / "img" / "icon.png"
+CHAR_IMG_PATH = RESOURCE_DIR / "chara"
+ALARM_SOUND_PATH = RESOURCE_DIR / "alarm"
+ALARM_1H_PATH = RESOURCE_DIR / "alarm1"
+ALARM_24H_PATH = RESOURCE_DIR / "alarm24"
 CUSTOM_IMG_PATH = BASE_DIR / "custom_images"
 CUSTOM_SOUND_PATH = BASE_DIR / "custom_sounds"
 CONFIG_FILE = BASE_DIR / "config.json"
 
 directories = [
-    CUSTOM_IMG_PATH, CUSTOM_SOUND_PATH, ALARM_SOUND_PATH,
-    ALARM_24H_PATH, ALARM_1H_PATH
+    CUSTOM_IMG_PATH, CUSTOM_SOUND_PATH
 ]
 for directory in directories:
-    directory.mkdir(exist_ok=True)
+    directory.mkdir(parents=True, exist_ok=True)
 
 reminders = []
 history = []
@@ -45,6 +58,391 @@ use_custom_sound = False
 selected_image = None
 selected_sound = None
 popup_manager = None
+
+class AnalogClockPicker(QDialog):
+    def __init__(self, parent=None, initial_time=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Time")
+        self.setFixedSize(400, 500)
+        self.setWindowFlags(Qt.Dialog | Qt.WindowCloseButtonHint)
+        
+        # Initialize time
+        if initial_time:
+            self.selected_time = initial_time
+        else:
+            self.selected_time = QTime.currentTime()
+            
+        self.dragging_hand = None  # 'hour', 'minute', 'second', or None
+        self.clock_center = QPoint(200, 150)
+        self.clock_radius = 120
+        
+        # Setup UI
+        self.setup_ui()
+        
+        # Timer for real-time updates
+        self.update_timer = QTimer()
+        self.update_timer.timeout.connect(self.update)
+        self.update_timer.start(100)  # Update every 100ms
+        
+    def setup_ui(self):
+        layout = QVBoxLayout()
+        layout.setSpacing(20)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Title
+        title = QLabel("Select Time")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("""
+            font-size: 18px;
+            font-weight: bold;
+            color: #E74C3C;
+            margin-bottom: 10px;
+        """)
+        layout.addWidget(title)
+        
+        # Clock widget (custom paint area)
+        self.clock_widget = QWidget()
+        self.clock_widget.setFixedSize(400, 300)
+        self.clock_widget.paintEvent = self.paint_clock
+        self.clock_widget.mousePressEvent = self.mouse_press_event
+        self.clock_widget.mouseMoveEvent = self.mouse_move_event
+        self.clock_widget.mouseReleaseEvent = self.mouse_release_event
+        layout.addWidget(self.clock_widget)
+        
+        # Digital time display
+        self.time_display = QLabel()
+        self.time_display.setAlignment(Qt.AlignCenter)
+        self.time_display.setStyleSheet("""
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            background: #f8f9fa;
+            border: 2px solid #E74C3C;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px 0;
+        """)
+        self.update_time_display()
+        layout.addWidget(self.time_display)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        
+        self.ok_button = QPushButton("OK")
+        self.ok_button.setStyleSheet("""
+            QPushButton {
+                background: #E74C3C;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 6px;
+                font-weight: 500;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background: #c0392b;
+            }
+        """)
+        self.ok_button.clicked.connect(self.accept)
+        
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.setStyleSheet("""
+            QPushButton {
+                background: #95a5a6;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 6px;
+                font-weight: 500;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background: #7f8c8d;
+            }
+        """)
+        self.cancel_button.clicked.connect(self.reject)
+        
+        self.now_button = QPushButton("Now")
+        self.now_button.setStyleSheet("""
+            QPushButton {
+                background: #3498db;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 6px;
+                font-weight: 500;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background: #2980b9;
+            }
+        """)
+        self.now_button.clicked.connect(self.set_current_time)
+        
+        button_layout.addWidget(self.now_button)
+        button_layout.addStretch()
+        button_layout.addWidget(self.cancel_button)
+        button_layout.addWidget(self.ok_button)
+        
+        layout.addLayout(button_layout)
+        self.setLayout(layout)
+        
+    def set_current_time(self):
+        self.selected_time = QTime.currentTime()
+        self.update_time_display()
+        self.update()
+        
+    def update_time_display(self):
+        time_str = self.selected_time.toString("HH:mm:ss")
+        self.time_display.setText(time_str)
+        
+    def paint_clock(self, event):
+        painter = QPainter(self.clock_widget)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Dynamic center calculation
+        self.clock_center = QPoint(self.clock_widget.width() // 2, self.clock_widget.height() // 2)
+        # Draw clock face
+        painter.setBrush(QBrush(QColor(255, 255, 255)))
+        painter.setPen(QPen(QColor(200, 200, 200), 2))
+        painter.drawEllipse(self.clock_center.x() - self.clock_radius, 
+                          self.clock_center.y() - self.clock_radius,
+                          self.clock_radius * 2, self.clock_radius * 2)
+        
+        # Draw hour markers
+        painter.setPen(QPen(QColor(100, 100, 100), 2))
+        for i in range(12):
+            angle = math.radians(i * 30 - 90)  # -90 to start from top
+            inner_radius = self.clock_radius - 15
+            outer_radius = self.clock_radius - 5
+            
+            x1 = self.clock_center.x() + inner_radius * math.cos(angle)
+            y1 = self.clock_center.y() + inner_radius * math.sin(angle)
+            x2 = self.clock_center.x() + outer_radius * math.cos(angle)
+            y2 = self.clock_center.y() + outer_radius * math.sin(angle)
+            
+            painter.drawLine(int(x1), int(y1), int(x2), int(y2))
+            
+            # Draw hour numbers
+            if i == 0:
+                num = 12
+            else:
+                num = i
+            num_radius = self.clock_radius - 25
+            num_x = self.clock_center.x() + num_radius * math.cos(angle) - 8
+            num_y = self.clock_center.y() + num_radius * math.sin(angle) + 5
+            
+            painter.setFont(QFont("Arial", 12, QFont.Bold))
+            painter.setPen(QPen(QColor(50, 50, 50)))
+            painter.drawText(int(num_x), int(num_y), str(num))
+        
+        # Draw minute markers
+        painter.setPen(QPen(QColor(150, 150, 150), 1))
+        for i in range(60):
+            if i % 5 != 0:  # Skip hour markers
+                angle = math.radians(i * 6 - 90)
+                inner_radius = self.clock_radius - 10
+                outer_radius = self.clock_radius - 5
+                
+                x1 = self.clock_center.x() + inner_radius * math.cos(angle)
+                y1 = self.clock_center.y() + inner_radius * math.sin(angle)
+                x2 = self.clock_center.x() + outer_radius * math.cos(angle)
+                y2 = self.clock_center.y() + outer_radius * math.sin(angle)
+                
+                painter.drawLine(int(x1), int(y1), int(x2), int(y2))
+        
+        # Draw hands
+        self.draw_hands(painter)
+        
+        # Draw center dot
+        painter.setBrush(QBrush(QColor(231, 76, 60)))
+        painter.setPen(QPen(QColor(231, 76, 60)))
+        painter.drawEllipse(self.clock_center.x() - 5, self.clock_center.y() - 5, 10, 10)
+        
+    def draw_hands(self, painter):
+        hour = self.selected_time.hour() % 12
+        minute = self.selected_time.minute()
+        second = self.selected_time.second()
+        
+        # Hour hand
+        hour_angle = math.radians((hour + minute/60.0) * 30 - 90)
+        hour_length = self.clock_radius * 0.5
+        hour_x = self.clock_center.x() + hour_length * math.cos(hour_angle)
+        hour_y = self.clock_center.y() + hour_length * math.sin(hour_angle)
+        
+        painter.setPen(QPen(QColor(50, 50, 50), 6, Qt.SolidLine, Qt.RoundCap))
+        painter.drawLine(self.clock_center.x(), self.clock_center.y(), int(hour_x), int(hour_y))
+        
+        # Minute hand
+        minute_angle = math.radians(minute * 6 - 90)
+        minute_length = self.clock_radius * 0.7
+        minute_x = self.clock_center.x() + minute_length * math.cos(minute_angle)
+        minute_y = self.clock_center.y() + minute_length * math.sin(minute_angle)
+        
+        painter.setPen(QPen(QColor(100, 100, 100), 4, Qt.SolidLine, Qt.RoundCap))
+        painter.drawLine(self.clock_center.x(), self.clock_center.y(), int(minute_x), int(minute_y))
+        
+        # Second hand
+        second_angle = math.radians(second * 6 - 90)
+        second_length = self.clock_radius * 0.8
+        second_x = self.clock_center.x() + second_length * math.cos(second_angle)
+        second_y = self.clock_center.y() + second_length * math.sin(second_angle)
+        
+        painter.setPen(QPen(QColor(231, 76, 60), 2, Qt.SolidLine, Qt.RoundCap))
+        painter.drawLine(self.clock_center.x(), self.clock_center.y(), int(second_x), int(second_y))
+        
+    def mouse_press_event(self, event):
+        if event.button() == Qt.LeftButton:
+            pos = event.pos()
+            distance = math.sqrt((pos.x() - self.clock_center.x())**2 + (pos.y() - self.clock_center.y())**2)
+            
+            if distance <= self.clock_radius:
+                # Determine which hand is closest to the click
+                angle = math.atan2(pos.y() - self.clock_center.y(), pos.x() - self.clock_center.x())
+                angle_deg = (math.degrees(angle) + 90) % 360
+                
+                hour = self.selected_time.hour() % 12
+                minute = self.selected_time.minute()
+                second = self.selected_time.second()
+                
+                hour_angle = (hour + minute/60.0) * 30
+                minute_angle = minute * 6
+                second_angle = second * 6
+                
+                # Calculate distances to each hand
+                hour_diff = abs(angle_deg - hour_angle)
+                if hour_diff > 180:
+                    hour_diff = 360 - hour_diff
+                    
+                minute_diff = abs(angle_deg - minute_angle)
+                if minute_diff > 180:
+                    minute_diff = 360 - minute_diff
+                    
+                second_diff = abs(angle_deg - second_angle)
+                if second_diff > 180:
+                    second_diff = 360 - second_diff
+                
+                # Choose the closest hand, but prioritize outer hands
+                if distance > self.clock_radius * 0.7 and second_diff < 30:
+                    self.dragging_hand = 'second'
+                elif distance > self.clock_radius * 0.5 and minute_diff < 30:
+                    self.dragging_hand = 'minute'
+                elif hour_diff < 45:
+                    self.dragging_hand = 'hour'
+                else:
+                    # Default to the closest one
+                    min_diff = min(hour_diff, minute_diff, second_diff)
+                    if min_diff == second_diff:
+                        self.dragging_hand = 'second'
+                    elif min_diff == minute_diff:
+                        self.dragging_hand = 'minute'
+                    else:
+                        self.dragging_hand = 'hour'
+                
+                self.update_time_from_mouse(pos)
+                
+    def mouse_move_event(self, event):
+        if self.dragging_hand:
+            self.update_time_from_mouse(event.pos())
+            
+    def mouse_release_event(self, event):
+        self.dragging_hand = None
+        
+    def update_time_from_mouse(self, pos):
+        if not self.dragging_hand:
+            return
+
+        angle = math.atan2(pos.y() - self.clock_center.y(), pos.x() - self.clock_center.x())
+        angle_deg = (math.degrees(angle) + 90) % 360
+
+        hour = self.selected_time.hour()
+        minute = self.selected_time.minute()
+        second = self.selected_time.second()
+
+        if self.dragging_hand == 'hour':
+            # Use fractional hour from angle
+            hour_fraction = angle_deg / 30.0  # 360° / 12 hours = 30° per hour
+            base_hour = int(hour_fraction) % 12
+            extra_minutes = int((hour_fraction - base_hour) * 60)
+
+            # Preserve AM/PM if original time is in 24-hour format
+            if hour >= 12:
+                base_hour = (base_hour % 12) + 12
+            hour = base_hour
+            minute = extra_minutes
+
+        elif self.dragging_hand == 'minute':
+            minute = int((angle_deg / 6.0) % 60)  # 360° / 60 minutes = 6° per minute
+
+        elif self.dragging_hand == 'second':
+            second = int((angle_deg / 6.0) % 60)  # 360° / 60 seconds = 6° per second
+
+        self.selected_time = QTime(hour, minute, second)
+        self.update_time_display()
+        self.update()
+
+        
+    def get_selected_time(self):
+        return self.selected_time
+
+class TimePickerWidget(QPushButton):
+    """Custom widget that displays time and opens analog clock picker when clicked"""
+    timeChanged = pyqtSignal(QTime)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.current_time = QTime.currentTime()
+        self.setMinimumHeight(32)
+        self.setStyleSheet("""
+            QPushButton {
+                background: #f8f9fa;
+                border: 2px solid #ecf0f1;
+                border-radius: 8px;
+                padding: 6px 10px;
+                text-align: left;
+            }
+            QPushButton:hover {
+                border-color: #E74C3C;
+            }
+        """)
+        layout = QHBoxLayout()
+        layout.setContentsMargins(8, 0, 8, 0)
+        
+        # Clock icon
+        self.clock_icon = QLabel("🕐")
+        self.clock_icon.setStyleSheet("border: none; background: transparent; font-size: 16px;")
+        
+        # Time display
+        self.time_label = QLabel()
+        self.time_label.setStyleSheet("border: none; background: transparent; font-weight: 500; font-align; center")
+        self.update_display()
+        
+        layout.addWidget(self.clock_icon)
+        layout.addWidget(self.time_label)
+        layout.addStretch()
+        
+        self.setLayout(layout)
+        
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.open_time_picker()
+            
+    def open_time_picker(self):
+        dialog = AnalogClockPicker(self, self.current_time)
+        if dialog.exec_() == QDialog.Accepted:
+            self.current_time = dialog.get_selected_time()
+            self.update_display()
+            self.timeChanged.emit(self.current_time)
+            
+    def update_display(self):
+        self.time_label.setText(self.current_time.toString("HH:mm:ss"))
+        
+    def setTime(self, time):
+        self.current_time = time
+        self.update_display()
+        
+    def time(self):
+        return self.current_time
 
 class ImagePopup(QWidget):
     def __init__(self, image_path):
@@ -128,6 +526,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.tray_icon = create_system_tray(QApplication.instance(), self)
+        self.setWindowIcon(QIcon(str(ICON_PATH)))
         self.setWindowTitle("CeLOE Reminder App")
         self.setMinimumSize(720, 850)
 
@@ -345,110 +744,89 @@ def get_dark_stylesheet():
         font-family: 'Segoe UI', system-ui, sans-serif;
         font-size: 10pt;
         color: #e0e0e0;
-        background: #1a1a1a;
+        background-color: #1e1e1e;
     }
     QPushButton { 
         background-color: #E74C3C;
         color: white;
         border: none;
         padding: 10px 20px;
-        border-radius: 6px;
+        border-radius: 8px;
         font-weight: 500;
     }
     QPushButton:hover { 
-        background-color: #d63026;
-        transition: background-color 0.2s;
+        background-color: #d84132;
+    }
+    QPushButton:pressed {
+        background-color: #c0392b;
     }
     QLineEdit, QDateTimeEdit, QTimeEdit { 
         padding: 10px;
-        border: 2px solid #333333;
+        border: 2px solid #2f2f2f;
         border-radius: 8px;
-        background: #262626;
+        background: #2a2a2a;
         color: #e0e0e0;
     }
     QLineEdit:focus, QDateTimeEdit:focus, QTimeEdit:focus {
         border: 2px solid #E74C3C;
-        background: #2d2d2d;
+        background: #333333;
     }
-    QLabel { 
+    QLabel {
         font-weight: 500;
         color: #e0e0e0;
     }
     QListWidget {
-        border: 2px solid #333333;
+        border: 2px solid #2f2f2f;
         border-radius: 8px;
         padding: 10px;
-        background: #262626;
+        background: #2a2a2a;
         color: #e0e0e0;
     }
-    QListWidget::item {
-        padding: 8px;
-        border-radius: 4px;
-        margin: 2px 0;
-    }
-    QListWidget::item:hover {
-        background: #333333;
-    }
     QListWidget::item:selected {
-        background: #E74C3C33;
+        background-color: #E74C3C33;
         color: #E74C3C;
     }
+    QListWidget::item:hover {
+        background: #393939;
+    }
     QGroupBox {
-        border: 2px solid #333333;
+        border: 2px solid #333;
         border-radius: 8px;
         padding: 15px;
         margin-top: 5px;
     }
     QRadioButton {
         color: #e0e0e0;
-        spacing: 8px;
+        spacing: 6px;
     }
     QRadioButton::indicator {
-        width: 18px;
-        height: 18px;
-        border-radius: 10px;
-        border: 2px solid #666666;
+        width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        border: 2px solid #888;
     }
     QRadioButton::indicator:checked {
         background-color: #E74C3C;
         border: 2px solid #E74C3C;
     }
-    QRadioButton::indicator:unchecked:hover {
-        border: 2px solid #E74C3C;
-    }
     QScrollBar:vertical {
-        border: none;
-        background: #262626;
+        background: #2a2a2a;
         width: 10px;
-        margin: 0;
     }
     QScrollBar::handle:vertical {
-        background: #666666;
+        background: #555;
         border-radius: 5px;
-        min-height: 20px;
     }
     QScrollBar::handle:vertical:hover {
         background: #E74C3C;
-    }
-    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-        height: 0px;
     }
     QCalendarWidget {
         background-color: #262626;
         color: #e0e0e0;
     }
-    QCalendarWidget QWidget {
-        alternate-background-color: #333333;
-    }
-    QCalendarWidget QAbstractItemView:enabled {
-        color: #e0e0e0;
-        background-color: #262626;
+    QCalendarWidget QAbstractItemView {
         selection-background-color: #E74C3C;
         selection-color: white;
-    }
-    QCalendarWidget QMenu {
-        background-color: #262626;
-        color: #e0e0e0;
     }
     """
 
@@ -458,48 +836,87 @@ def get_light_stylesheet():
         font-family: 'Segoe UI', system-ui, sans-serif;
         font-size: 10pt;
         color: #2c3e50;
-        background: #ffffff;
+        background-color: #ffffff;
     }
     QPushButton { 
         background-color: #E74C3C;
         color: white;
         border: none;
         padding: 10px 20px;
-        border-radius: 6px;
+        border-radius: 8px;
         font-weight: 500;
     }
     QPushButton:hover { 
         background-color: #c0392b;
-        transition: background-color 0.2s;
     }
-    QLineEdit, QDateTimeEdit, QTimeEdit { 
+    QPushButton:pressed {
+        background-color: #a93226;
+    }
+    QLineEdit, QDateTimeEdit, QTimeEdit {
         padding: 10px;
-        border: 2px solid #ecf0f1;
+        border: 2px solid #ddd;
         border-radius: 8px;
-        background: #f8f9fa;
+        background: #fdfdfd;
     }
     QLineEdit:focus, QDateTimeEdit:focus, QTimeEdit:focus {
         border: 2px solid #E74C3C;
-        background: white;
+        background: #ffffff;
     }
-    QLabel { 
+    QLabel {
         font-weight: 500;
-        color: #2c3e52;
+        color: #2c3e50;
     }
     QListWidget {
-        border: 2px solid #ecf0f1;
+        border: 2px solid #ddd;
         border-radius: 8px;
         padding: 10px;
-        background: #f8f9fa;
-    }
-    QListWidget::item {
-        padding: 8px;
-        border-radius: 4px;
-        margin: 2px 0;
+        background: #fafafa;
     }
     QListWidget::item:selected {
-        background: #fde8e7;
+        background-color: #fde8e7;
         color: #E74C3C;
+    }
+    QListWidget::item:hover {
+        background: #f0f0f0;
+    }
+    QGroupBox {
+        border: 2px solid #ccc;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 5px;
+    }
+    QRadioButton {
+        color: #2c3e50;
+        spacing: 6px;
+    }
+    QRadioButton::indicator {
+        width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        border: 2px solid #aaa;
+    }
+    QRadioButton::indicator:checked {
+        background-color: #E74C3C;
+        border: 2px solid #E74C3C;
+    }
+    QScrollBar:vertical {
+        background: #f2f2f2;
+        width: 10px;
+    }
+    QScrollBar::handle:vertical {
+        background: #bbb;
+        border-radius: 5px;
+    }
+    QScrollBar::handle:vertical:hover {
+        background: #E74C3C;
+    }
+    QCalendarWidget {
+        background-color: #ffffff;
+        color: #2c3e50;
+    }
+    QCalendarWidget QAbstractItemView {
+        selection-background-color: #E74C3C;
+        selection-color: white;
     }
     """
 
@@ -525,39 +942,68 @@ class ReminderTab(QWidget):
         self.layout.addWidget(self.title_input)
 
         # Input tanggal & waktu
+        # Input tanggal & waktu
         datetime_label = QLabel("Tanggal & Waktu")
-        datetime_label.setStyleSheet("font-size: 12px; margin-top: 8px;")
+        datetime_label.setStyleSheet("font-size: 13px; font-weight: bold; margin-top: 8px;")
         self.layout.addWidget(datetime_label)
 
-        datetime_frame = QHBoxLayout()
-        datetime_frame.setSpacing(12)
+        datetime_row = QHBoxLayout()
+        datetime_row.setSpacing(16)
+
+        # Date input
         self.date_input = QDateTimeEdit()
         self.date_input.setDisplayFormat("dd/MM/yyyy")
         self.date_input.setCalendarPopup(True)
         self.date_input.setDate(QDateTime.currentDateTime().date())
-        self.date_input.setMinimumHeight(32)
-        self.time_input = QTimeEdit()
-        self.time_input.setDisplayFormat("HH:mm:ss")
+        self.date_input.setFixedHeight(36)
+        self.date_input.setStyleSheet("""
+            QDateTimeEdit {
+                padding: 6px 10px;
+                font-size: 13px;
+                border: 1px solid #ccc;
+                border-radius: 6px;
+            }
+        """)
+
+        # Time input
+        self.time_input = TimePickerWidget()
         self.time_input.setTime(QDateTime.currentDateTime().time())
-        self.time_input.setTimeRange(QTime(0, 0, 0), QTime(23, 59, 59))
-        self.time_input.setButtonSymbols(QTimeEdit.PlusMinus)
-        self.time_input.setMinimumHeight(32)
-        datetime_frame.addWidget(self.date_input)
-        datetime_frame.addWidget(self.time_input)
-        self.layout.addLayout(datetime_frame)
+        self.time_input.setFixedHeight(36)
+        self.time_input.setStyleSheet("""
+            QTimeEdit {
+                padding: 6px 10px;
+                font-size: 13px;
+                border: 1px solid #ccc;
+                border-radius: 6px;
+            }
+        """)
+
+        self.time_input.timeChanged.connect(self.on_time_changed)
+
+        datetime_row.addWidget(self.date_input)
+        datetime_row.addWidget(self.time_input)
+        self.layout.addLayout(datetime_row)
 
         # Tombol aksi (horizontal)
+        # Tombol aksi (horizontal)
         button_row = QHBoxLayout()
-        button_row.setSpacing(10)
+        button_row.setSpacing(12)
+
         self.add_button = QPushButton("Tambah")
-        self.add_button.setMinimumHeight(32)
+        self.add_button.setStyleSheet("background-color: #dc3545; color: white; font-weight: bold; border-radius: 6px; padding: 6px;")
+        self.add_button.setMinimumHeight(36)
         self.add_button.clicked.connect(self.add_reminder)
+
         self.edit_button = QPushButton("Edit")
-        self.edit_button.setMinimumHeight(32)
+        self.edit_button.setStyleSheet("background-color: #dc3545; color: white; font-weight: bold; border-radius: 6px; padding: 6px;")
+        self.edit_button.setMinimumHeight(36)
         self.edit_button.clicked.connect(self.edit_reminder)
+
         self.delete_button = QPushButton("Hapus")
-        self.delete_button.setMinimumHeight(32)
+        self.delete_button.setStyleSheet("background-color: #dc3545; color: white; font-weight: bold; border-radius: 6px; padding: 6px;")
+        self.delete_button.setMinimumHeight(36)
         self.delete_button.clicked.connect(self.delete_reminder)
+
         button_row.addWidget(self.add_button)
         button_row.addWidget(self.edit_button)
         button_row.addWidget(self.delete_button)
@@ -630,11 +1076,11 @@ class ReminderTab(QWidget):
         if datetime_obj <= datetime.now():
             QMessageBox.warning(self, "Warning", "Masukkan waktu yang akan datang.")
             return
-        old = reminders[selected]
-        cancel_scheduled(old['title'])
+        
         reminders[selected] = {'title': title, 'datetime': datetime_obj}
         self.reminder_list.item(selected).setText(f"{title} | {datetime_obj.strftime('%Y-%m-%d %H:%M:%S')}")
-        schedule_notification(title, datetime_obj)
+        QMessageBox.information(self, "Berhasil", "Reminder berhasil diperbarui.")
+        self.title_input.clear()
 
     def delete_reminder(self):
         selected = self.reminder_list.currentRow()
@@ -653,6 +1099,9 @@ class ReminderTab(QWidget):
         self.reminder_list.clear()
         for r in reminders:
             self.reminder_list.addItem(f"{r['title']} | {r['datetime'].strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    def on_time_changed(self, new_time):
+        pass
 
 class BrowserTab(QWidget):
     def __init__(self):
@@ -1264,6 +1713,7 @@ def run_scheduler():
 def create_system_tray(app, window):
     tray_icon = QSystemTrayIcon(QIcon(str(ICON_PATH)), app)
     tray_menu = QMenu()
+
 
     # CeLOE Submenu
     celoe_menu = tray_menu.addMenu("CeLOE")
