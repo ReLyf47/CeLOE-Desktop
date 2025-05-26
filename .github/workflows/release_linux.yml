@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - master
+  push:
     tags:
       - 'v*'
   workflow_dispatch:
@@ -29,24 +30,48 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
           
-      - name: Create virtual environment and install Python dependencies
+      - name: Create virtual environment and install PyInstaller
         run: |
           python -m venv venv
           source venv/bin/activate
           pip install --upgrade pip
           pip install pyinstaller
           
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller (with detailed analysis)
         run: |
           source venv/bin/activate
+          
+          # Install app dependencies if requirements.txt exists
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+            echo "=== Installed dependencies ==="
+            pip list
+          fi
+          
+          # Check resource directories
+          echo "=== Resource directories ==="
+          ls -la alarm* img* 2>/dev/null || echo "Some resource directories missing"
+          
+          # Build with verbose output and analysis
           pyinstaller reminder.py \
             --onefile \
             --add-data "alarm:alarm" \
             --add-data "alarm1:alarm1" \
             --add-data "alarm24:alarm24" \
             --add-data "img:img" \
+            --hidden-import=tkinter \
+            --hidden-import=tkinter.messagebox \
+            --hidden-import=tkinter.filedialog \
+            --collect-all pygame \
+            --collect-all PIL \
+            --collect-all numpy \
             --strip \
-            --clean
+            --clean \
+            --log-level DEBUG
+            
+          echo "=== Build completed ==="
+          ls -lh dist/
+          file dist/reminder
             
       - name: Download AppImageTool
         run: |
@@ -67,8 +92,8 @@ jobs:
           # Create desktop file
           cat > AppDir/usr/share/applications/CeLOE_Desktop.desktop << EOF
           [Desktop Entry]
-          Name=Reminder
-          Comment=A Desktop Version of CeLOE
+          Name=CeLOE_Desktop
+          Comment=CeLOE Desktop Reminder Application
           Exec=reminder
           Icon=reminder
           Type=Application
@@ -78,7 +103,7 @@ jobs:
           EOF
           
           # Copy desktop file to AppDir root
-          cp AppDir/usr/share/applications/CeLOE_Desktop.desktop AppDir/
+          cp AppDir/usr/share/applications/reminder.desktop AppDir/
           
           # Handle icon
           if [ -f "img/icon.png" ]; then
@@ -145,14 +170,14 @@ jobs:
           tag_name: ${{ steps.version.outputs.version }}
           name: Release ${{ steps.version.outputs.version }}
           body: |
-            ## CeLOE Desktop AppImage Release ${{ steps.version.outputs.version }}
+            ## Reminder AppImage Release ${{ steps.version.outputs.version }}
             
             Built on Arch Linux with PyInstaller and AppImageTool.
             
             ### Installation
             1. Download the AppImage file
-            2. Make it executable: `chmod +x CeLOE_Desktop-${{ steps.version.outputs.version }}.AppImage`
-            3. Run it: `./CeLOE_Desktop-${{ steps.version.outputs.version }}.AppImage`
+            2. Make it executable: `chmod +x reminder-${{ steps.version.outputs.version }}.AppImage`
+            3. Run it: `./reminder-${{ steps.version.outputs.version }}.AppImage`
             
             ### Changes
             - Auto-generated release from commit ${{ github.sha }}

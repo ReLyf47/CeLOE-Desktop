@@ -19,12 +19,32 @@ jobs:
       with:
         python-version: '3.11'  # Adjust version as needed
         
+    - name: Get version info
+      id: version
+      run: |
+        if ("${{ github.ref }}" -like "refs/tags/*") {
+          $version = "${{ github.ref }}" -replace "refs/tags/", ""
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          echo "is_release=true" >> $env:GITHUB_OUTPUT
+        } else {
+          $date = Get-Date -Format "yyyyMMdd"
+          $sha = "${{ github.sha }}".Substring(0,7)
+          $version = "$date-$sha"
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          echo "is_release=false" >> $env:GITHUB_OUTPUT
+        }
+        echo "Version: $version"
+        
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install cx_Freeze
         # Install your app dependencies if you have a requirements.txt
-        pip install -r requirements.txt
+        if (Test-Path "requirements.txt") {
+          pip install -r requirements.txt
+        } else {
+          echo "No requirements.txt found"
+        }
         
     - name: Create setup.py for cx_Freeze
       run: |
@@ -54,8 +74,8 @@ jobs:
         
         setup(
             name='CeLOE Desktop',
-            version='1.0.0',
-            description='CeLOE Desktop',
+            version='${{ steps.version.outputs.version }}',
+            description='CeLOE Desktop Reminder Application',
             options={'build_exe': build_options, 'bdist_msi': {}},
             executables=executables
         )
@@ -64,34 +84,74 @@ jobs:
     - name: Build MSI installer
       run: |
         python setup.py bdist_msi
+        echo "Build completed. Checking dist folder..."
+        Get-ChildItem -Path "dist" -Recurse
         
-    - name: Find MSI file
+    - name: Find and prepare MSI file
+      id: msi_info
       run: |
         $msiFile = Get-ChildItem -Path "dist" -Filter "*.msi" | Select-Object -First 1
-        echo "MSI_FILE=$($msiFile.FullName)" >> $env:GITHUB_ENV
-        echo "MSI_NAME=$($msiFile.Name)" >> $env:GITHUB_ENV
+        if ($msiFile) {
+          $fullPath = $msiFile.FullName
+          $fileName = $msiFile.Name
+          echo "MSI_FILE=$fullPath" >> $env:GITHUB_ENV
+          echo "MSI_NAME=$fileName" >> $env:GITHUB_ENV
+          echo "msi_file=$fullPath" >> $env:GITHUB_OUTPUT
+          echo "msi_name=$fileName" >> $env:GITHUB_OUTPUT
+          echo "Found MSI file: $fileName at $fullPath"
+          
+          # Show file size
+          $size = [math]::Round($msiFile.Length / 1MB, 2)
+          echo "MSI file size: $size MB"
+        } else {
+          echo "ERROR: No MSI file found in dist folder!"
+          exit 1
+        }
         
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: CeLOE_Desktop-msi
+        name: CeLOE_Desktop-msi-${{ steps.version.outputs.version }}
         path: ${{ env.MSI_FILE }}
+        retention-days: 30
         
     - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
+      if: steps.version.outputs.is_release == 'true'
+      uses: softprops/action-gh-release@v2
       with:
         files: ${{ env.MSI_FILE }}
+        tag_name: ${{ steps.version.outputs.version }}
+        name: Release ${{ steps.version.outputs.version }}
         draft: false
         prerelease: false
         generate_release_notes: true
-        name: Release ${{ github.ref_name }}
         body: |
-          ## Windows MSI Installer
+          ## Windows MSI Installer - ${{ steps.version.outputs.version }}
           
-          Download and run the MSI file to install the Reminder application.
+          Download and run the MSI file to install the CeLOE Desktop Reminder application.
           
-          **Installation**: Double-click the MSI file and follow the installation wizard.
-          **Uninstallation**: Use Windows "Add or Remove Programs" to uninstall.
+          ### Installation Instructions
+          1. Download the MSI file: `${{ steps.msi_info.outputs.msi_name }}`
+          2. Double-click the MSI file to start the installation wizard
+          3. Follow the installation prompts
+          4. The application will be installed and available in your Start Menu
+          
+          ### Uninstallation
+          Use Windows "Add or Remove Programs" to uninstall the application.
+          
+          ### Changes
+          - Built from commit: ${{ github.sha }}
+          - Build date: ${{ github.run_id }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Debug release info (if release creation fails)
+      if: failure() && steps.version.outputs.is_release == 'true'
+      run: |
+        echo "=== DEBUG INFORMATION ==="
+        echo "GitHub ref: ${{ github.ref }}"
+        echo "Is release: ${{ steps.version.outputs.is_release }}"
+        echo "Version: ${{ steps.version.outputs.version }}"
+        echo "MSI file: ${{ env.MSI_FILE }}"
+        echo "MSI exists: $(Test-Path '${{ env.MSI_FILE }}')"
+        echo "GitHub token available: ${{ secrets.GITHUB_TOKEN != '' }}"
