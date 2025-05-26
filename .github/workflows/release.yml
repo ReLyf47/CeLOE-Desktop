@@ -8,7 +8,7 @@ on:
     inputs:
       tag:
         description: 'Tag name to create release from'
-        required: true
+        required: false
 
 jobs:
   build:
@@ -58,6 +58,11 @@ jobs:
 
         ./linuxdeploy-dir/AppRun --appdir AppDir -o appimage
         mv Reminder*.AppImage reminder.AppImage
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.ref || github.event.inputs.tag || github.ref }}
 
     - name: Upload to GitHub Release
       uses: softprops/action-gh-release@v2
