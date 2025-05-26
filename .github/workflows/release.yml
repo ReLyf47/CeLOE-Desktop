@@ -35,15 +35,19 @@ jobs:
 
     - name: Package into AppImage
       run: |
-        sudo apt update
-        sudo apt install -y appimagetool
+        wget -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool
+        sudo mv appimagetool /usr/local/bin/
+
         mkdir -p AppDir/usr/bin
         cp dist/reminder AppDir/usr/bin/reminder
         cp -r alarm alarm1 alarm24 img AppDir/usr/bin/
         chmod +x AppDir/usr/bin/reminder
+
         echo -e '[Desktop Entry]\nName=Reminder\nExec=reminder\nIcon=alarm\nType=Application\nCategories=Utility;' > AppDir/reminder.desktop
         mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
         cp img/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/alarm.png || true
+
         appimagetool AppDir reminder.AppImage
 
     - name: Upload to GitHub Release
